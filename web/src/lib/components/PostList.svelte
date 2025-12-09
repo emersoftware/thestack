@@ -6,51 +6,45 @@
   import PostCard from './PostCard.svelte';
   import LoadMoreButton from './LoadMoreButton.svelte';
 
-  let { sort = 'hot' }: { sort: 'hot' | 'new' } = $props();
+  let {
+    sort = 'hot',
+    initialPosts,
+    initialHasMore,
+  }: {
+    sort: 'hot' | 'new';
+    initialPosts: Post[];
+    initialHasMore: boolean;
+  } = $props();
 
   const session = useSession();
   const user = $derived($session.data?.user);
 
-  let posts = $state<Post[]>([]);
+  let posts = $state<Post[]>(initialPosts);
   let myUpvotes = $state<Set<string>>(new Set());
-  let loading = $state(true);
   let loadingMore = $state(false);
   let error = $state('');
   let page = $state(1);
-  let hasMore = $state(false);
-
-  async function loadPosts(pageNum: number, append = false) {
-    try {
-      const response = await getPosts(sort, pageNum);
-      if (append) {
-        posts = [...posts, ...response.posts];
-      } else {
-        posts = response.posts;
-      }
-      hasMore = response.hasMore;
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Error al cargar posts';
-    }
-  }
+  let hasMore = $state(initialHasMore);
 
   async function loadMore() {
     if (loadingMore || !hasMore) return;
     loadingMore = true;
     page += 1;
-    await loadPosts(page, true);
-    loadingMore = false;
+    try {
+      const response = await getPosts(sort, page);
+      posts = [...posts, ...response.posts];
+      hasMore = response.hasMore;
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Error al cargar posts';
+    } finally {
+      loadingMore = false;
+    }
   }
 
   onMount(async () => {
-    try {
-      const [_, upvotedIds] = await Promise.all([
-        loadPosts(1),
-        getMyUpvotedPostIds().catch(() => []),
-      ]);
-      myUpvotes = new Set(upvotedIds);
-    } finally {
-      loading = false;
-    }
+    // Fetch upvotes client-side (requires auth cookies)
+    const upvotedIds = await getMyUpvotedPostIds().catch(() => []);
+    myUpvotes = new Set(upvotedIds);
   });
 
   // Refetch upvotes when user changes
@@ -69,11 +63,7 @@
   });
 </script>
 
-{#if loading}
-  <div class="flex justify-center py-8">
-    <p class="text-neutral-500">Cargando posts...</p>
-  </div>
-{:else if error}
+{#if error}
   <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
     {error}
   </div>
