@@ -98,15 +98,15 @@
   <title>Admin - the stack</title>
 </svelte:head>
 
-<div class="mt-8 w-full max-w-4xl mx-auto px-4">
-  <h1 class="text-2xl font-bold text-the-black mb-6">Admin Panel</h1>
+<div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
+  <h1 class="text-xl sm:text-2xl font-bold text-the-black mb-4 sm:mb-6">Admin Panel</h1>
 
   <!-- Tabs -->
-  <div class="flex gap-2 mb-6 border-b border-neutral-200">
+  <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-neutral-200 overflow-x-auto">
     {#each ['stats', 'users', 'posts'] as tab}
       <button
         onclick={() => (activeTab = tab as 'stats' | 'users' | 'posts')}
-        class="px-4 py-2 text-sm font-medium transition-colors
+        class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
           {activeTab === tab
           ? 'text-the-black border-b-2 border-the-black'
           : 'text-neutral-500 hover:text-the-black'}"
@@ -125,26 +125,26 @@
   {:else}
     <!-- Stats Tab -->
     {#if activeTab === 'stats' && stats}
-      <div class="grid grid-cols-3 gap-4">
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-6 text-center">
-          <p class="text-3xl font-bold text-the-black">{stats.users}</p>
-          <p class="text-sm text-neutral-500">Usuarios</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.users}</p>
+          <p class="text-xs sm:text-sm text-neutral-500">Usuarios</p>
         </div>
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-6 text-center">
-          <p class="text-3xl font-bold text-the-black">{stats.posts}</p>
-          <p class="text-sm text-neutral-500">Posts</p>
+        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.posts}</p>
+          <p class="text-xs sm:text-sm text-neutral-500">Posts</p>
         </div>
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-6 text-center">
-          <p class="text-3xl font-bold text-the-black">{stats.upvotes}</p>
-          <p class="text-sm text-neutral-500">Upvotes</p>
+        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.upvotes}</p>
+          <p class="text-xs sm:text-sm text-neutral-500">Upvotes</p>
         </div>
       </div>
     {/if}
 
     <!-- Users Tab -->
     {#if activeTab === 'users'}
-      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-x-auto">
+        <table class="w-full text-xs sm:text-sm min-w-[500px]">
           <thead class="bg-the-white border-b border-neutral-200">
             <tr>
               <th class="text-left px-4 py-3 font-medium text-neutral-700">Usuario</th>
@@ -201,8 +201,8 @@
 
     <!-- Posts Tab -->
     {#if activeTab === 'posts'}
-      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-x-auto">
+        <table class="w-full text-xs sm:text-sm min-w-[500px]">
           <thead class="bg-the-white border-b border-neutral-200">
             <tr>
               <th class="text-left px-4 py-3 font-medium text-neutral-700">Titulo</th>

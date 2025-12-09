@@ -65,10 +65,10 @@
   <title>Registro - the stack</title>
 </svelte:head>
 
-<div class="flex-1 flex items-center justify-center bg-the-white">
-  <div class="max-w-md w-full space-y-8 px-4">
+<div class="flex-1 flex items-center justify-center bg-the-white py-4 sm:py-0">
+  <div class="max-w-md w-full space-y-6 sm:space-y-8 px-4">
     <div>
-      <h2 class="text-center text-3xl text-neutral-900">
+      <h2 class="text-center text-2xl sm:text-3xl text-neutral-900">
         Únete a <span class="font-extrabold text-the-black">the stack</span>
       </h2>
     </div>

@@ -61,7 +61,7 @@
   <title>{domain} - the stack</title>
 </svelte:head>
 
-<div class="mt-8 w-full max-w-4xl mx-auto px-4">
+<div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
   {#if loading}
     <p class="text-neutral-500 text-center py-8">Cargando...</p>
   {:else if error}
@@ -72,9 +72,9 @@
     </div>
   {:else if data}
     <!-- Domain Header -->
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-the-black">{data.domain}</h1>
-      <p class="text-sm text-neutral-500 mt-1">
+    <div class="mb-4 sm:mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-the-black">{data.domain}</h1>
+      <p class="text-xs sm:text-sm text-neutral-500 mt-1">
         {data.totalPosts}
         {data.totalPosts === 1 ? 'post' : 'posts'}
       </p>
@@ -84,7 +84,7 @@
     {#if posts.length === 0}
       <p class="text-neutral-500 text-center py-8">Sin posts de este dominio</p>
     {:else}
-      <div class="grid gap-2 justify-items-start">
+      <div class="grid gap-2 sm:gap-3 justify-items-stretch sm:justify-items-start">
         {#each posts as post (post.id)}
           <PostCard {post} hasUpvoted={myUpvotes.has(post.id)} />
         {/each}
