@@ -8,7 +8,29 @@
 
   const user = $derived($session.data?.user as CustomUser | undefined);
   const pathname = $derived($page.url.pathname);
+
+  let dropdownOpen = $state(false);
+
+  function toggleDropdown() {
+    dropdownOpen = !dropdownOpen;
+  }
+
+  function closeDropdown() {
+    dropdownOpen = false;
+  }
+
+  function handleLogout() {
+    closeDropdown();
+    signOutUser();
+  }
 </script>
+
+<svelte:window onclick={(e) => {
+  const target = e.target as HTMLElement;
+  if (!target.closest('.user-dropdown')) {
+    dropdownOpen = false;
+  }
+}} />
 
 <header class="w-full max-w-4xl mx-auto flex justify-between items-center px-4 py-3">
   <div class="flex items-center gap-6">
@@ -19,14 +41,6 @@
 
     <!-- Navigation Tabs -->
     <nav class="flex items-center gap-1">
-      <a
-        href="/"
-        class="px-3 py-1 text-sm rounded-md transition-colors {pathname === '/'
-          ? 'bg-neutral-100 text-the-black font-medium'
-          : 'text-neutral-500 hover:text-the-black'}"
-      >
-        hot
-      </a>
       <a
         href="/new"
         class="px-3 py-1 text-sm rounded-md transition-colors {pathname === '/new'
@@ -40,7 +54,8 @@
 
   <div class="flex items-center">
     {#if !$session.isPending && user}
-      <div class="flex items-center space-x-3">
+      <!-- Desktop: links horizontales -->
+      <div class="hidden md:flex items-center space-x-3">
         {#if pathname !== '/submit'}
           <a
             href="/submit"
@@ -57,21 +72,50 @@
           {user.username || user.name}
         </a>
 
-        {#if user.isAdmin}
-          <a
-            href="/admin"
-            class="text-sm text-neutral-500 hover:text-the-black"
-          >
-            admin
-          </a>
-        {/if}
-
         <button
           onclick={signOutUser}
           class="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700"
         >
           logout
         </button>
+      </div>
+
+      <!-- Mobile: dropdown -->
+      <div class="md:hidden relative user-dropdown">
+        <button
+          onclick={toggleDropdown}
+          class="flex items-center gap-1 text-sm text-neutral-700 hover:text-the-black"
+        >
+          {user.username || user.name}
+          <svg class="w-4 h-4 transition-transform {dropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {#if dropdownOpen}
+          <div class="absolute right-0 mt-2 w-40 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 z-50">
+            <a
+              href="/submit"
+              onclick={closeDropdown}
+              class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Publicar
+            </a>
+            <a
+              href="/user/{user.username || user.name}"
+              onclick={closeDropdown}
+              class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Perfil
+            </a>
+            <button
+              onclick={handleLogout}
+              class="w-full text-left px-4 py-2 text-sm text-neutral-500 hover:bg-neutral-50"
+            >
+              Logout
+            </button>
+          </div>
+        {/if}
       </div>
     {:else if !$session.isPending && !user && pathname !== '/login' && pathname !== '/register'}
       <a
