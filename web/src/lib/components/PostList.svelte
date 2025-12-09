@@ -6,18 +6,26 @@
   import PostCard from './PostCard.svelte';
   import LoadMoreButton from './LoadMoreButton.svelte';
 
-  let { sort = 'hot' }: { sort: 'hot' | 'new' } = $props();
+  let {
+    sort = 'hot',
+    initialPosts = [],
+    initialHasMore = false,
+  }: {
+    sort: 'hot' | 'new';
+    initialPosts?: Post[];
+    initialHasMore?: boolean;
+  } = $props();
 
   const session = useSession();
   const user = $derived($session.data?.user);
 
-  let posts = $state<Post[]>([]);
+  let posts = $state<Post[]>(initialPosts);
   let myUpvotes = $state<Set<string>>(new Set());
-  let loading = $state(true);
+  let loading = $state(initialPosts.length === 0);
   let loadingMore = $state(false);
   let error = $state('');
   let page = $state(1);
-  let hasMore = $state(false);
+  let hasMore = $state(initialHasMore);
 
   async function loadPosts(pageNum: number, append = false) {
     try {
@@ -43,10 +51,12 @@
 
   onMount(async () => {
     try {
-      const [_, upvotedIds] = await Promise.all([
-        loadPosts(1),
-        getMyUpvotedPostIds().catch(() => []),
-      ]);
+      // If no initial posts, fetch them client-side
+      if (initialPosts.length === 0) {
+        await loadPosts(1);
+      }
+      // Fetch upvotes client-side (requires auth cookies)
+      const upvotedIds = await getMyUpvotedPostIds().catch(() => []);
       myUpvotes = new Set(upvotedIds);
     } finally {
       loading = false;
