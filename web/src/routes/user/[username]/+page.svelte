@@ -1,8 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { onMount } from 'svelte';
+  import type { PageData } from './$types';
   import {
-    getUser,
     getUserPosts,
     updateUserAbout,
     type UserProfile,
@@ -13,6 +12,8 @@
   import PostCard from '$lib/components/PostCard.svelte';
   import LoadMoreButton from '$lib/components/LoadMoreButton.svelte';
 
+  let { data }: { data: PageData } = $props();
+
   const username = $derived($page.params.username);
   const session = useSession();
   const currentUser = $derived($session.data?.user);
@@ -20,38 +21,28 @@
     currentUser && 'username' in currentUser && currentUser.username === username
   );
 
-  let profile = $state<UserProfile | null>(null);
-  let posts = $state<Post[]>([]);
+  let profile = $state<UserProfile | null>(data.profile);
+  let posts = $state<Post[]>(data.posts);
   let myUpvotes = $state<Set<string>>(new Set());
-  let loading = $state(true);
   let loadingMore = $state(false);
-  let error = $state('');
+  let error = $state(data.profile ? '' : 'Usuario no encontrado');
   let pageNum = $state(1);
-  let hasMore = $state(false);
+  let hasMore = $state(data.hasMore);
 
   let editing = $state(false);
   let editAbout = $state('');
   let saving = $state(false);
 
-  async function loadData() {
-    loading = true;
-    error = '';
-    try {
-      const [profileData, postsData, upvotedIds] = await Promise.all([
-        getUser(username),
-        getUserPosts(username, 1),
-        getMyUpvotedPostIds().catch(() => []),
-      ]);
-      profile = profileData;
-      posts = postsData.posts;
-      hasMore = postsData.hasMore;
-      myUpvotes = new Set(upvotedIds);
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Error al cargar perfil';
-    } finally {
-      loading = false;
-    }
-  }
+  // Load upvotes client-side
+  $effect(() => {
+    getMyUpvotedPostIds()
+      .then((ids) => {
+        myUpvotes = new Set(ids);
+      })
+      .catch(() => {
+        myUpvotes = new Set();
+      });
+  });
 
   async function loadMore() {
     if (loadingMore || !hasMore) return;
@@ -88,15 +79,6 @@
       day: 'numeric',
     });
   }
-
-  onMount(loadData);
-
-  $effect(() => {
-    if (username) {
-      pageNum = 1;
-      loadData();
-    }
-  });
 </script>
 
 <svelte:head>
@@ -104,9 +86,7 @@
 </svelte:head>
 
 <div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
-  {#if loading}
-    <p class="text-neutral-500 text-center py-8">Cargando...</p>
-  {:else if error}
+  {#if error}
     <div
       class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
     >
