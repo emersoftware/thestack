@@ -85,7 +85,7 @@
     </a>
   </div>
 {:else}
-  <div class="grid gap-2 justify-items-start">
+  <div class="grid gap-2 sm:gap-3 justify-items-stretch sm:justify-items-start">
     {#each posts as post (post.id)}
       <PostCard {post} hasUpvoted={myUpvotes.has(post.id)} />
     {/each}

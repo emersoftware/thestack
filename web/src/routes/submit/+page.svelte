@@ -101,10 +101,10 @@
     <p class="text-neutral-500">Verificando autenticación...</p>
   </div>
 {:else if authorized}
-  <div class="flex-1 flex items-center justify-center">
-    <div class="max-w-md w-full space-y-8 px-4">
+  <div class="flex-1 flex items-center justify-center py-4 sm:py-0">
+    <div class="max-w-md w-full space-y-6 sm:space-y-8 px-4">
       <div>
-        <h2 class="text-center text-3xl text-neutral-900">
+        <h2 class="text-center text-2xl sm:text-3xl text-neutral-900">
           Publicar en <span class="font-extrabold text-the-black">the stack</span>
         </h2>
       </div>

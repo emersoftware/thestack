@@ -103,7 +103,7 @@
   <title>{username} - the stack</title>
 </svelte:head>
 
-<div class="mt-8 w-full max-w-4xl mx-auto px-4">
+<div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
   {#if loading}
     <p class="text-neutral-500 text-center py-8">Cargando...</p>
   {:else if error}
@@ -113,18 +113,18 @@
       {error}
     </div>
   {:else if profile}
-    <div class="bg-the-white border border-neutral-200 rounded-xl p-6 mb-6">
-      <div class="flex justify-between items-start">
+    <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
         <div>
-          <h1 class="text-2xl font-bold text-the-black">{profile.username}</h1>
-          <p class="text-sm text-neutral-500 mt-1">
+          <h1 class="text-xl sm:text-2xl font-bold text-the-black">{profile.username}</h1>
+          <p class="text-xs sm:text-sm text-neutral-500 mt-1">
             {profile.karma} karma · miembro desde {formatDate(profile.createdAt)}
           </p>
         </div>
         {#if isOwnProfile && !editing}
           <button
             onclick={startEdit}
-            class="text-sm text-neutral-500 hover:text-the-black"
+            class="text-sm text-neutral-500 hover:text-the-black self-start"
           >
             editar
           </button>
@@ -161,11 +161,11 @@
       {/if}
     </div>
 
-    <h2 class="text-lg font-medium text-the-black mb-4">Posts</h2>
+    <h2 class="text-base sm:text-lg font-medium text-the-black mb-3 sm:mb-4">Posts</h2>
     {#if posts.length === 0}
       <p class="text-neutral-500 text-center py-8">Sin posts todavía</p>
     {:else}
-      <div class="grid gap-2 justify-items-start">
+      <div class="grid gap-2 sm:gap-3 justify-items-stretch sm:justify-items-start">
         {#each posts as post (post.id)}
           <PostCard {post} hasUpvoted={myUpvotes.has(post.id)} />
         {/each}

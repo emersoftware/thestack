@@ -94,36 +94,36 @@
 </script>
 
 <article
-  class="bg-the-white rounded-xl py-3 pl-4 pr-3 border border-neutral-200 hover:border-the-black transition-colors duration-200 w-fit"
+  class="bg-the-white rounded-xl py-3 pl-3 pr-3 sm:pl-4 border border-neutral-200 hover:border-the-black transition-colors duration-200 w-full sm:w-fit"
 >
   <div class="flex flex-col gap-2">
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-start sm:items-center justify-between gap-2">
       <a
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
-        class="hover:underline w-full truncate text-the-black hover:text-neutral-600 text-sm leading-snug"
+        class="hover:underline text-the-black hover:text-neutral-600 text-sm leading-snug break-words sm:truncate sm:max-w-md"
       >
         {post.title}
       </a>
       <a
         href="/site/{post.domain}"
-        class="text-xs shrink-0 border-neutral-300 border text-neutral-500 hover:border-the-black hover:text-the-black transition-colors duration-200 px-2 py-1 m-0 rounded-full"
+        class="text-xs shrink-0 border-neutral-300 border text-neutral-500 hover:border-the-black hover:text-the-black transition-colors duration-200 px-2 py-1 m-0 rounded-full max-w-[120px] truncate"
       >
         {post.domain}
       </a>
     </div>
-    <div class="flex items-center gap-3 text-xs text-neutral-500">
+    <div class="flex items-center gap-2 sm:gap-3 text-xs text-neutral-500 flex-wrap">
       <UpvoteButton
         count={optimisticCount}
         active={optimisticUpvoted}
         onclick={handleUpvote}
         {loading}
       />
-      <span>·</span>
+      <span class="hidden sm:inline">·</span>
       <span>{getRelativeTime(post.createdAt)}</span>
       <span>·</span>
-      <a href="/user/{post.author.username}" class="hover:text-the-black">
+      <a href="/user/{post.author.username}" class="hover:text-the-black truncate max-w-[100px] sm:max-w-none">
         {post.author.username}
       </a>
     </div>

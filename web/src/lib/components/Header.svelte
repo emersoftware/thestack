@@ -33,17 +33,17 @@
 }} />
 
 <header class="w-full max-w-4xl mx-auto flex justify-between items-center px-4 py-3">
-  <div class="flex items-center gap-6">
-    <a href="/" class="flex items-center gap-2">
+  <div class="flex items-center gap-3 sm:gap-6">
+    <a href="/" class="flex items-center gap-1.5 sm:gap-2">
       <Logo />
-      <h1 class="text-xl font-bold text-the-black">the stack</h1>
+      <h1 class="text-lg sm:text-xl font-bold text-the-black">the stack</h1>
     </a>
 
     <!-- Navigation Tabs -->
     <nav class="flex items-center gap-1">
       <a
         href="/new"
-        class="px-3 py-1 text-sm rounded-md transition-colors {pathname === '/new'
+        class="px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-colors {pathname === '/new'
           ? 'bg-neutral-100 text-the-black font-medium'
           : 'text-neutral-500 hover:text-the-black'}"
       >
@@ -130,9 +130,9 @@
 
 {#if user && !user.emailVerified}
   <div class="w-full max-w-4xl mx-auto px-4">
-    <div class="border border-the-red text-the-red px-4 py-2 rounded-lg text-sm flex items-center justify-between">
-      <span>Verifica tu email para publicar y votar. Revisa tu bandeja de entrada.</span>
-      <a href="/resend-verification" class="underline hover:no-underline font-medium">
+    <div class="border border-the-red text-the-red px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+      <span>Verifica tu email para publicar y votar.</span>
+      <a href="/resend-verification" class="underline hover:no-underline font-medium whitespace-nowrap">
         Reenviar email
       </a>
     </div>
