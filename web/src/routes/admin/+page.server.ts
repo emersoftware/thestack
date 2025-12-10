@@ -10,9 +10,13 @@ interface SessionResponse {
   };
 }
 
-export const load: PageServerLoad = async ({ fetch }) => {
+export const load: PageServerLoad = async ({ fetch, request }) => {
+  const cookies = request.headers.get('cookie') || '';
+
   // Check auth first
-  const sessionRes = await fetch(`${PUBLIC_API_URL}/api/auth/get-session`);
+  const sessionRes = await fetch(`${PUBLIC_API_URL}/api/auth/get-session`, {
+    headers: { cookie: cookies },
+  });
 
   if (!sessionRes.ok) {
     throw redirect(302, '/login');
@@ -30,10 +34,11 @@ export const load: PageServerLoad = async ({ fetch }) => {
 
   // Fetch admin data in parallel
   try {
+    const fetchWithCookies = (url: string) => fetch(url, { headers: { cookie: cookies } });
     const [statsRes, usersRes, postsRes] = await Promise.all([
-      fetch(`${PUBLIC_API_URL}/api/admin/stats`),
-      fetch(`${PUBLIC_API_URL}/api/admin/users`),
-      fetch(`${PUBLIC_API_URL}/api/admin/posts`),
+      fetchWithCookies(`${PUBLIC_API_URL}/api/admin/stats`),
+      fetchWithCookies(`${PUBLIC_API_URL}/api/admin/users`),
+      fetchWithCookies(`${PUBLIC_API_URL}/api/admin/posts`),
     ]);
 
     const stats: AdminStats = statsRes.ok ? await statsRes.json() : { users: 0, posts: 0, upvotes: 0 };

@@ -128,7 +128,7 @@
             required
             minlength={3}
             maxlength={20}
-            pattern="[a-zA-Z0-9_-]+"
+            pattern="[a-zA-Z0-9_\-]+"
             class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-the-black"
             placeholder="tu_username"
           />
