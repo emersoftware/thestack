@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# D1 Database binding
+# D1 Database binding (local por defecto para desarrollo)
 [[d1_databases]]
 binding = "DB"
 database_name = "the-stack-db"
@@ -12,6 +12,21 @@ database_id = "local"
 [vars]
 ENVIRONMENT = "development"
 
-# Cron trigger - recalculate scores every 10 minutes
-[triggers]
+# ============================================
+# Production environment
+# Deploy con: npx wrangler deploy --env production
+# Test cron local: npx wrangler dev --test-scheduled
+# ============================================
+[env.production]
+name = "the-stack-api"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "the-stack-db"
+database_id = "2fab040d-8589-4f40-9401-aa4da7cc4d51"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[env.production.triggers]
 crons = ["*/10 * * * *"]
