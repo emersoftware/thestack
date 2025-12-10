@@ -59,12 +59,6 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap');
-    </style>
-  </defs>
-
   <!-- White background -->
   <rect x="0" y="0" width="1200" height="630" fill="#f5f5f5"/>
 
@@ -85,15 +79,15 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
   </g>
 
   <!-- Site name next to logo -->
-  <text x="140" y="102" font-family="Inter, system-ui, sans-serif" font-size="32" font-weight="600" fill="#141414">the stack</text>
+  <text x="140" y="102" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#141414">the stack</text>
 
   <!-- Post title centered -->
-  <text x="600" y="${titleY}" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="700" fill="#141414" text-anchor="middle" dominant-baseline="middle">
+  <text x="600" y="${titleY}" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="700" fill="#141414" text-anchor="middle" dominant-baseline="middle">
     ${titleTspans}
   </text>
 
   <!-- Domain and author at bottom -->
-  <text x="600" y="540" font-family="Inter, system-ui, sans-serif" font-size="24" fill="#666666" text-anchor="middle">
+  <text x="600" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#666666" text-anchor="middle">
     ${domain ? `<tspan>${escapeXml(domain)}</tspan>` : ''}${domain && author ? '<tspan> · </tspan>' : ''}${author ? `<tspan>@${escapeXml(author)}</tspan>` : ''}
   </text>
 </svg>`;
