@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, asc, inArray, sql } from 'drizzle-orm';
+import { eq, and, asc, inArray, sql, gte } from 'drizzle-orm';
 import { createAuth, type Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { generateId } from '../lib/utils';
@@ -32,7 +32,7 @@ comments.get('/post/:postId', async (c) => {
         postId: schema.comments.postId,
         parentId: schema.comments.parentId,
         content: schema.comments.content,
-        likesCount: schema.comments.likesCount,
+        upvotesCount: schema.comments.upvotesCount,
         isDeleted: schema.comments.isDeleted,
         createdAt: schema.comments.createdAt,
         authorId: schema.comments.authorId,
@@ -49,12 +49,12 @@ comments.get('/post/:postId', async (c) => {
       const commentIds = result.map((c) => c.id);
       if (commentIds.length > 0) {
         const myLikes = await db
-          .select({ commentId: schema.commentLikes.commentId })
-          .from(schema.commentLikes)
+          .select({ commentId: schema.commentUpvotes.commentId })
+          .from(schema.commentUpvotes)
           .where(
             and(
-              eq(schema.commentLikes.userId, session.user.id),
-              inArray(schema.commentLikes.commentId, commentIds)
+              eq(schema.commentUpvotes.userId, session.user.id),
+              inArray(schema.commentUpvotes.commentId, commentIds)
             )
           );
         myLikedIds = new Set(myLikes.map((l) => l.commentId));
@@ -66,8 +66,8 @@ comments.get('/post/:postId', async (c) => {
       postId: comment.postId,
       parentId: comment.parentId,
       content: comment.isDeleted ? '[eliminado]' : comment.content,
-      likesCount: comment.likesCount,
-      hasLiked: myLikedIds.has(comment.id),
+      upvotesCount: comment.upvotesCount,
+      hasUpvoted: myLikedIds.has(comment.id),
       isDeleted: comment.isDeleted,
       createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : null,
       author: {
@@ -96,6 +96,22 @@ comments.post('/post/:postId', async (c) => {
 
   const db = drizzle(c.env.DB, { schema });
   const postId = c.req.param('postId');
+
+  // Rate limit: 50 comments per hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentComments = await db
+    .select({ id: schema.comments.id })
+    .from(schema.comments)
+    .where(
+      and(
+        eq(schema.comments.authorId, session.user.id),
+        gte(schema.comments.createdAt, oneHourAgo)
+      )
+    );
+
+  if (recentComments.length >= 50) {
+    return c.json({ error: 'Has alcanzado el límite de comentarios por hora' }, 429);
+  }
 
   try {
     // Verify post exists
@@ -139,14 +155,14 @@ comments.post('/post/:postId', async (c) => {
       authorId: session.user.id,
       parentId: parentId || null,
       content,
-      likesCount: 1,
+      upvotesCount: 1,
       isDeleted: false,
       createdAt: now,
       updatedAt: now,
     });
 
     // Auto-like own comment (like posts)
-    await db.insert(schema.commentLikes).values({
+    await db.insert(schema.commentUpvotes).values({
       id: generateId(),
       commentId,
       userId: session.user.id,
@@ -159,7 +175,7 @@ comments.post('/post/:postId', async (c) => {
         postId: schema.comments.postId,
         parentId: schema.comments.parentId,
         content: schema.comments.content,
-        likesCount: schema.comments.likesCount,
+        upvotesCount: schema.comments.upvotesCount,
         isDeleted: schema.comments.isDeleted,
         createdAt: schema.comments.createdAt,
         authorId: schema.comments.authorId,
@@ -176,8 +192,8 @@ comments.post('/post/:postId', async (c) => {
       postId: comment.postId,
       parentId: comment.parentId,
       content: comment.content,
-      likesCount: comment.likesCount,
-      hasLiked: true,
+      upvotesCount: comment.upvotesCount,
+      hasUpvoted: true,
       isDeleted: comment.isDeleted,
       createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : null,
       author: {
@@ -231,15 +247,15 @@ comments.delete('/:id', async (c) => {
   }
 });
 
-// Toggle like on a comment
-comments.post('/:id/like', async (c) => {
+// Toggle upvote on a comment
+comments.post('/:id/upvote', async (c) => {
   const session = await getSession(c);
   if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión para dar like' }, 401);
+    return c.json({ error: 'Debes iniciar sesión para votar' }, 401);
   }
 
   if (!session.user.emailVerified) {
-    return c.json({ error: 'Debes verificar tu email para dar like' }, 403);
+    return c.json({ error: 'Debes verificar tu email para votar' }, 403);
   }
 
   const db = drizzle(c.env.DB, { schema });
@@ -265,33 +281,33 @@ comments.post('/:id/like', async (c) => {
 
     const existingLike = await db
       .select()
-      .from(schema.commentLikes)
+      .from(schema.commentUpvotes)
       .where(
         and(
-          eq(schema.commentLikes.commentId, commentId),
-          eq(schema.commentLikes.userId, userId)
+          eq(schema.commentUpvotes.commentId, commentId),
+          eq(schema.commentUpvotes.userId, userId)
         )
       )
       .limit(1);
 
-    let hasLiked: boolean;
+    let hasUpvoted: boolean;
     let newCount: number;
 
     if (existingLike.length > 0) {
       // Remove like
       await db
-        .delete(schema.commentLikes)
+        .delete(schema.commentUpvotes)
         .where(
           and(
-            eq(schema.commentLikes.commentId, commentId),
-            eq(schema.commentLikes.userId, userId)
+            eq(schema.commentUpvotes.commentId, commentId),
+            eq(schema.commentUpvotes.userId, userId)
           )
         );
 
       await db
         .update(schema.comments)
         .set({
-          likesCount: sql`${schema.comments.likesCount} - 1`,
+          upvotesCount: sql`${schema.comments.upvotesCount} - 1`,
           updatedAt: new Date(),
         })
         .where(eq(schema.comments.id, commentId));
@@ -301,11 +317,11 @@ comments.post('/:id/like', async (c) => {
         .set({ karma: sql`${schema.users.karma} - 1` })
         .where(eq(schema.users.id, comment.authorId));
 
-      hasLiked = false;
-      newCount = comment.likesCount - 1;
+      hasUpvoted = false;
+      newCount = comment.upvotesCount - 1;
     } else {
       // Add like
-      await db.insert(schema.commentLikes).values({
+      await db.insert(schema.commentUpvotes).values({
         id: generateId(),
         commentId,
         userId,
@@ -315,7 +331,7 @@ comments.post('/:id/like', async (c) => {
       await db
         .update(schema.comments)
         .set({
-          likesCount: sql`${schema.comments.likesCount} + 1`,
+          upvotesCount: sql`${schema.comments.upvotesCount} + 1`,
           updatedAt: new Date(),
         })
         .where(eq(schema.comments.id, commentId));
@@ -325,14 +341,14 @@ comments.post('/:id/like', async (c) => {
         .set({ karma: sql`${schema.users.karma} + 1` })
         .where(eq(schema.users.id, comment.authorId));
 
-      hasLiked = true;
-      newCount = comment.likesCount + 1;
+      hasUpvoted = true;
+      newCount = comment.upvotesCount + 1;
     }
 
-    return c.json({ hasLiked, likesCount: newCount });
+    return c.json({ hasUpvoted, upvotesCount: newCount });
   } catch (error) {
     console.error('Error toggling comment like:', error);
-    return c.json({ error: 'Error al dar like' }, 500);
+    return c.json({ error: 'Error al votar' }, 500);
   }
 });
 

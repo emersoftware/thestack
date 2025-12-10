@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Comment } from '$lib/comments';
-  import { createComment, deleteComment, toggleCommentLike } from '$lib/comments';
+  import { createComment, deleteComment, toggleCommentUpvote } from '$lib/comments';
   import { useSession } from '$lib/auth';
   import { goto } from '$app/navigation';
   import { toast } from '$lib/toast';
@@ -17,7 +17,7 @@
   let replyingTo = $state<string | null>(null);
   let replyContent = $state('');
   let submitting = $state(false);
-  let likingComment = $state<string | null>(null);
+  let upvotingComment = $state<string | null>(null);
   let deletingCommentId = $state<string | null>(null);
 
   // Build tree structure from flat comments
@@ -161,24 +161,24 @@
     node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  async function handleLike(commentId: string) {
+  async function handleUpvote(commentId: string) {
     if (!user) {
       goto('/login');
       return;
     }
 
-    if (likingComment) return;
+    if (upvotingComment) return;
 
     // Optimistic update
     const comment = comments.find(c => c.id === commentId);
     if (!comment) return;
 
-    const wasLiked = comment.hasLiked;
-    const prevCount = comment.likesCount;
+    const wasLiked = comment.hasUpvoted;
+    const prevCount = comment.upvotesCount;
 
     comments = comments.map(c =>
       c.id === commentId
-        ? { ...c, hasLiked: !wasLiked, likesCount: wasLiked ? c.likesCount - 1 : c.likesCount + 1 }
+        ? { ...c, hasUpvoted: !wasLiked, upvotesCount: wasLiked ? c.upvotesCount - 1 : c.upvotesCount + 1 }
         : c
     );
 
@@ -186,26 +186,26 @@
       logoStore.bump();
     }
 
-    likingComment = commentId;
+    upvotingComment = commentId;
     try {
-      const result = await toggleCommentLike(commentId);
+      const result = await toggleCommentUpvote(commentId);
       comments = comments.map(c =>
         c.id === commentId
-          ? { ...c, hasLiked: result.hasLiked, likesCount: result.likesCount }
+          ? { ...c, hasUpvoted: result.hasUpvoted, upvotesCount: result.upvotesCount }
           : c
       );
     } catch (err) {
       // Rollback
       comments = comments.map(c =>
         c.id === commentId
-          ? { ...c, hasLiked: wasLiked, likesCount: prevCount }
+          ? { ...c, hasUpvoted: wasLiked, upvotesCount: prevCount }
           : c
       );
       if (err instanceof ApiError) {
         toast.error(err.message);
       }
     } finally {
-      likingComment = null;
+      upvotingComment = null;
     }
   }
 </script>
@@ -293,21 +293,21 @@
           <!-- Like button -->
           <button
             type="button"
-            onclick={() => handleLike(comment.id)}
-            disabled={likingComment === comment.id}
+            onclick={() => handleUpvote(comment.id)}
+            disabled={upvotingComment === comment.id}
             data-nav-upvote
-            class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasLiked ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {likingComment === comment.id ? 'animate-pulse' : ''}"
+            class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasUpvoted ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {upvotingComment === comment.id ? 'animate-pulse' : ''}"
           >
             <svg
-              class="w-3 h-3 {likingComment === comment.id ? 'opacity-50' : ''}"
+              class="w-3 h-3 {upvotingComment === comment.id ? 'opacity-50' : ''}"
               viewBox="0 0 24 24"
-              fill={comment.hasLiked ? 'currentColor' : 'none'}
+              fill={comment.hasUpvoted ? 'currentColor' : 'none'}
               stroke="currentColor"
               stroke-width="2"
             >
               <path d="M12 6 L19 18 L5 18 Z" />
             </svg>
-            <span class="text-xs font-semibold {comment.hasLiked ? 'text-the-black' : 'text-neutral-500'} {likingComment === comment.id ? 'opacity-50' : ''}">{comment.likesCount}</span>
+            <span class="text-xs font-semibold {comment.hasUpvoted ? 'text-the-black' : 'text-neutral-500'} {upvotingComment === comment.id ? 'opacity-50' : ''}">{comment.upvotesCount}</span>
           </button>
           <button
             type="button"

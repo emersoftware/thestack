@@ -5,8 +5,8 @@ export interface Comment {
   postId: string;
   parentId: string | null;
   content: string;
-  likesCount: number;
-  hasLiked: boolean;
+  upvotesCount: number;
+  hasUpvoted: boolean;
   isDeleted: boolean;
   createdAt: string;
   author: {
@@ -19,9 +19,9 @@ export interface CommentsResponse {
   comments: Comment[];
 }
 
-export interface CommentLikeResponse {
-  hasLiked: boolean;
-  likesCount: number;
+export interface CommentUpvoteResponse {
+  hasUpvoted: boolean;
+  upvotesCount: number;
 }
 
 export async function getComments(postId: string): Promise<CommentsResponse> {
@@ -45,8 +45,8 @@ export async function deleteComment(id: string): Promise<{ success: boolean }> {
   });
 }
 
-export async function toggleCommentLike(commentId: string): Promise<CommentLikeResponse> {
-  return apiFetch<CommentLikeResponse>(`/api/comments/${commentId}/like`, {
+export async function toggleCommentUpvote(commentId: string): Promise<CommentUpvoteResponse> {
+  return apiFetch<CommentUpvoteResponse>(`/api/comments/${commentId}/upvote`, {
     method: 'POST',
   });
 }

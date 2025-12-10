@@ -129,7 +129,7 @@ export const comments = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     parentId: text('parent_id'),
     content: text('content').notNull(),
-    likesCount: integer('likes_count').default(0).notNull(),
+    upvotesCount: integer('upvotes_count').default(0).notNull(),
     isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -142,8 +142,8 @@ export const comments = sqliteTable(
   ]
 );
 
-export const commentLikes = sqliteTable(
-  'comment_likes',
+export const commentUpvotes = sqliteTable(
+  'comment_upvotes',
   {
     id: text('id').primaryKey(),
     commentId: text('comment_id')
@@ -155,9 +155,9 @@ export const commentLikes = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   },
   (table) => [
-    index('idx_comment_likes_comment').on(table.commentId),
-    index('idx_comment_likes_user').on(table.userId),
-    uniqueIndex('idx_comment_likes_unique').on(table.commentId, table.userId),
+    index('idx_comment_upvotes_comment').on(table.commentId),
+    index('idx_comment_upvotes_user').on(table.userId),
+    uniqueIndex('idx_comment_upvotes_unique').on(table.commentId, table.userId),
   ]
 );
 
@@ -171,5 +171,5 @@ export type PostUpvote = typeof postUpvotes.$inferSelect;
 export type NewPostUpvote = typeof postUpvotes.$inferInsert;
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
-export type CommentLike = typeof commentLikes.$inferSelect;
-export type NewCommentLike = typeof commentLikes.$inferInsert;
+export type CommentUpvote = typeof commentUpvotes.$inferSelect;
+export type NewCommentUpvote = typeof commentUpvotes.$inferInsert;
