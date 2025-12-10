@@ -20,7 +20,10 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'https://thestack.cl'],
+    origin: (origin, c) => {
+      const allowed = [c.env.FRONTEND_URL, 'https://thestack.cl'].filter(Boolean);
+      return allowed.includes(origin) ? origin : allowed[0];
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
