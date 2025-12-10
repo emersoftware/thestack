@@ -212,7 +212,7 @@
 
 <style>
   :global([data-nav-focus="true"]) {
-    outline: 2px solid var(--color-the-black) !important;
-    outline-offset: 2px;
+    outline: none !important;
+    box-shadow: 0 0 0 2px var(--color-the-black) !important;
   }
 </style>

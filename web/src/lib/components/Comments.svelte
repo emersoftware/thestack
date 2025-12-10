@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { toast } from '$lib/toast';
   import { ApiError } from '$lib/api';
+  import { logoStore } from '$lib/stores/logo';
 
   let { postId, initialComments = [] }: { postId: string; initialComments?: Comment[] } = $props();
 
@@ -17,6 +18,7 @@
   let replyContent = $state('');
   let submitting = $state(false);
   let likingComment = $state<string | null>(null);
+  let deletingCommentId = $state<string | null>(null);
 
   // Build tree structure from flat comments
   const commentTree = $derived.by(() => {
@@ -69,12 +71,16 @@
       const comment = await createComment(postId, newComment.trim());
       comments = [...comments, comment];
       newComment = '';
-      // Focus on new comment
+      logoStore.bump();
+      // Scroll to new comment, only add focus if vim mode is active
       setTimeout(() => {
         const el = document.querySelector(`[data-nav-id="${comment.id}"]`) as HTMLElement;
         if (el) {
-          document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
-          el.setAttribute('data-nav-focus', 'true');
+          const vimMode = localStorage.getItem('vimMode') === 'true';
+          if (vimMode) {
+            document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
+            el.setAttribute('data-nav-focus', 'true');
+          }
           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       }, 50);
@@ -103,12 +109,16 @@
       comments = [...comments, comment];
       replyContent = '';
       replyingTo = null;
-      // Focus on new reply
+      logoStore.bump();
+      // Scroll to new reply, only add focus if vim mode is active
       setTimeout(() => {
         const el = document.querySelector(`[data-nav-id="${comment.id}"]`) as HTMLElement;
         if (el) {
-          document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
-          el.setAttribute('data-nav-focus', 'true');
+          const vimMode = localStorage.getItem('vimMode') === 'true';
+          if (vimMode) {
+            document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
+            el.setAttribute('data-nav-focus', 'true');
+          }
           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       }, 50);
@@ -123,18 +133,23 @@
     }
   }
 
-  async function handleDelete(commentId: string) {
-    if (!confirm('¿Eliminar este comentario?')) return;
+  function handleDelete(commentId: string) {
+    deletingCommentId = commentId;
+  }
 
+  async function confirmDelete() {
+    if (!deletingCommentId) return;
     try {
-      await deleteComment(commentId);
+      await deleteComment(deletingCommentId);
       comments = comments.map(c =>
-        c.id === commentId
+        c.id === deletingCommentId
           ? { ...c, content: '[eliminado]', isDeleted: true, author: { ...c.author, username: '[eliminado]' } }
           : c
       );
     } catch {
       toast.error('Error al eliminar comentario');
+    } finally {
+      deletingCommentId = null;
     }
   }
 
@@ -167,6 +182,10 @@
         : c
     );
 
+    if (!wasLiked) {
+      logoStore.bump();
+    }
+
     likingComment = commentId;
     try {
       const result = await toggleCommentLike(commentId);
@@ -191,9 +210,9 @@
   }
 </script>
 
-<div class="mt-8">
+<div class="mt-4">
   <!-- Header -->
-  <div class="flex items-center gap-3 mb-5">
+  <div class="flex items-center gap-3 mb-4">
     <span class="text-sm font-semibold text-the-black">
       {comments.length} {comments.length === 1 ? 'comentario' : 'comentarios'}
     </span>
@@ -201,17 +220,20 @@
   </div>
 
   <!-- New comment form -->
-  <form onsubmit={handleSubmit} class="mb-6" data-nav-item>
-    <div class="bg-the-white rounded-xl border border-neutral-200 focus-within:border-the-black transition-colors overflow-hidden">
+  <form onsubmit={handleSubmit} class="mb-4">
+    <div class="bg-the-white rounded-xl border border-neutral-200 focus-within:border-the-black transition-colors p-3 sm:p-4" data-nav-item>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-xs font-semibold text-the-black">{user?.name || 'Tú'}</span>
+      </div>
       <textarea
         bind:value={newComment}
         placeholder={user ? 'Escribe un comentario...' : 'Inicia sesión para comentar'}
         disabled={!user || submitting}
-        rows="3"
+        rows="1"
         data-nav-textarea
-        class="w-full px-4 py-3 text-sm bg-transparent focus:outline-none resize-none disabled:cursor-not-allowed placeholder:text-neutral-400"
+        class="w-full text-sm bg-transparent focus:outline-none resize-none disabled:cursor-not-allowed placeholder:text-neutral-400 leading-relaxed"
       ></textarea>
-      <div class="flex justify-end px-3 pb-3">
+      <div class="flex justify-end mt-2">
         <button
           type="submit"
           data-nav-submit
@@ -240,20 +262,14 @@
 </div>
 
 {#snippet commentNode(comment: Comment, depth: number)}
-  <div
-    class="relative"
-    style="margin-left: {Math.min(depth * 20, 60)}px"
-    data-nav-item
-    data-nav-id={comment.id}
-    data-nav-parent={comment.parentId || ''}
-    data-nav-depth={depth}
-  >
-    <!-- Thread line for nested comments -->
-    {#if depth > 0}
-      <div class="absolute left-0 top-0 bottom-0 w-px bg-neutral-200 -translate-x-3"></div>
-    {/if}
-
-    <div class="bg-the-white rounded-xl border border-neutral-200 hover:border-neutral-300 transition-colors p-3 sm:p-4">
+  <div class="relative {depth > 0 ? 'ml-4 sm:ml-8' : ''}">
+    <div
+      class="bg-the-white rounded-xl border border-neutral-200 hover:border-neutral-300 transition-colors p-3 sm:p-4"
+      data-nav-item
+      data-nav-id={comment.id}
+      data-nav-parent={comment.parentId || ''}
+      data-nav-depth={depth}
+    >
       <!-- Comment header -->
       <div class="flex items-center gap-2 mb-2">
         <a
@@ -316,40 +332,49 @@
         </div>
       {/if}
 
-      <!-- Reply form -->
-      {#if replyingTo === comment.id}
-        <div class="mt-3 pt-3 border-t border-neutral-100" use:scrollIntoView>
-          <div class="bg-neutral-50 rounded-lg border border-neutral-200 focus-within:border-the-black transition-colors overflow-hidden">
-            <textarea
-              bind:value={replyContent}
-              placeholder="Escribe una respuesta..."
-              rows="2"
-              data-nav-textarea
-              data-nav-submit-id={comment.id}
-              class="w-full px-3 py-2 text-sm bg-transparent focus:outline-none resize-none placeholder:text-neutral-400"
-            ></textarea>
-            <div class="flex gap-2 justify-end px-2 pb-2">
-              <button
-                type="button"
-                onclick={() => { replyingTo = null; replyContent = ''; }}
-                class="px-3 py-1 text-xs text-neutral-500 hover:text-the-black transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onclick={() => handleReply(comment.id)}
-                disabled={!replyContent.trim() || submitting}
-                data-nav-submit={comment.id}
-                class="px-3 py-1 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
-              >
-                {submitting ? '...' : 'Responder'}
-              </button>
-            </div>
+    </div>
+
+    <!-- Reply form as separate card -->
+    {#if replyingTo === comment.id}
+      <div
+        class="mt-2 ml-4 sm:ml-8"
+        use:scrollIntoView
+      >
+        <div class="bg-the-white rounded-xl border border-the-black p-3 sm:p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-semibold text-the-black">{user?.name || 'Tú'}</span>
+            <span class="text-xs text-neutral-400">·</span>
+            <span class="text-xs text-neutral-400">borrador</span>
+          </div>
+          <textarea
+            bind:value={replyContent}
+            placeholder="Escribe una respuesta..."
+            rows="1"
+            data-nav-textarea
+            data-nav-submit-id={comment.id}
+            class="w-full text-sm bg-transparent focus:outline-none resize-none placeholder:text-neutral-400 leading-relaxed"
+          ></textarea>
+          <div class="flex gap-2 justify-end mt-1">
+            <button
+              type="button"
+              onclick={() => { replyingTo = null; replyContent = ''; }}
+              class="px-3 py-1 text-xs text-neutral-500 hover:text-the-black transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onclick={() => handleReply(comment.id)}
+              disabled={!replyContent.trim() || submitting}
+              data-nav-submit={comment.id}
+              class="px-3 py-1 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
+            >
+              {submitting ? '...' : 'Responder'}
+            </button>
           </div>
         </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
 
     <!-- Nested replies -->
     {#if getChildren(comment.id).length > 0}
@@ -361,3 +386,24 @@
     {/if}
   </div>
 {/snippet}
+
+{#if deletingCommentId}
+  <div
+    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    onclick={() => deletingCommentId = null}
+    role="dialog"
+  >
+    <div class="bg-the-white rounded-xl shadow-xl max-w-sm w-full p-4" onclick={e => e.stopPropagation()}>
+      <h2 class="text-lg font-semibold text-the-black mb-2">Eliminar comentario</h2>
+      <p class="text-sm text-neutral-600 mb-4">Seguro? Esta acción no se puede deshacer.</p>
+      <div class="flex justify-end gap-2">
+        <button onclick={() => deletingCommentId = null} class="px-4 py-2 text-sm text-neutral-600 hover:text-the-black">
+          Cancelar
+        </button>
+        <button onclick={confirmDelete} class="px-4 py-2 text-sm font-medium text-the-red border border-the-red rounded-full hover:bg-the-red hover:text-the-white transition-colors">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

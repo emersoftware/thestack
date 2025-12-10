@@ -93,10 +93,10 @@
       {error}
     </div>
   {:else if profile}
-    <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+    <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-4 mb-4">
+      <div class="flex sm:flex-row justify-between sm:items-start gap-2 sm:gap-0">
         <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-the-black">{profile.username}</h1>
+          <h1 class="text-lg text-the-black">{profile.username}</h1>
           <p class="text-xs sm:text-sm text-neutral-500 mt-1">
             {profile.karma} karma · miembro desde {formatDate(profile.createdAt)}
           </p>
