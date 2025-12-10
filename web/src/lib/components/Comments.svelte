@@ -70,8 +70,8 @@
       comments = [...comments, comment];
       newComment = '';
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        toast.error('Debes verificar tu email para comentar');
+      if (err instanceof ApiError) {
+        toast.error(err.message);
       } else {
         toast.error('Error al crear comentario');
       }
@@ -95,8 +95,8 @@
       replyContent = '';
       replyingTo = null;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        toast.error('Debes verificar tu email para comentar');
+      if (err instanceof ApiError) {
+        toast.error(err.message);
       } else {
         toast.error('Error al crear comentario');
       }
@@ -164,8 +164,8 @@
           ? { ...c, hasLiked: wasLiked, likesCount: prevCount }
           : c
       );
-      if (err instanceof ApiError && err.status === 403) {
-        toast.error('Debes verificar tu email para dar like');
+      if (err instanceof ApiError) {
+        toast.error(err.message);
       }
     } finally {
       likingComment = null;

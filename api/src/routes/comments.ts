@@ -263,10 +263,6 @@ comments.post('/:id/like', async (c) => {
       return c.json({ error: 'No puedes dar like a un comentario eliminado' }, 400);
     }
 
-    if (comment.authorId === userId) {
-      return c.json({ error: 'No puedes dar like a tu propio comentario' }, 403);
-    }
-
     const existingLike = await db
       .select()
       .from(schema.commentLikes)

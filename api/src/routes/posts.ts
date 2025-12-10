@@ -344,10 +344,6 @@ posts.post('/:id/upvote', async (c) => {
 
     const post = existingPost[0];
 
-    if (post.authorId === userId) {
-      return c.json({ error: 'No puedes votar tu propio post' }, 403);
-    }
-
     const existingUpvote = await db
       .select()
       .from(schema.postUpvotes)
