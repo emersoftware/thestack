@@ -223,7 +223,7 @@
   <form onsubmit={handleSubmit} class="mb-4">
     <div class="bg-the-white rounded-xl border border-neutral-200 focus-within:border-the-black transition-colors p-3 sm:p-4" data-nav-item>
       <div class="flex items-center gap-2 mb-2">
-        <span class="text-xs font-semibold text-the-black">{user?.name || 'Tú'}</span>
+        <span class="text-xs font-semibold text-the-black">{user?.username || 'Tú'}</span>
       </div>
       <textarea
         bind:value={newComment}
@@ -342,7 +342,7 @@
       >
         <div class="bg-the-white rounded-xl border border-the-black p-3 sm:p-4">
           <div class="flex items-center gap-2 mb-2">
-            <span class="text-xs font-semibold text-the-black">{user?.name || 'Tú'}</span>
+            <span class="text-xs font-semibold text-the-black">{user?.username || 'Tú'}</span>
             <span class="text-xs text-neutral-400">·</span>
             <span class="text-xs text-neutral-400">borrador</span>
           </div>
