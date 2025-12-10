@@ -21,6 +21,15 @@
 
 <svelte:head>
   <title>{data.post.title} - the stack</title>
+  <meta property="og:title" content={data.post.title} />
+  <meta property="og:description" content={`${data.post.domain} · @${data.post.author.username}`} />
+  <meta property="og:url" content={`https://thestack.cl/post/${data.post.id}`} />
+  <meta property="og:image" content={`https://thestack.cl/og/post/${data.post.id}`} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:title" content={data.post.title} />
+  <meta name="twitter:description" content={`${data.post.domain} · @${data.post.author.username}`} />
+  <meta name="twitter:image" content={`https://thestack.cl/og/post/${data.post.id}`} />
 </svelte:head>
 
 <div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
