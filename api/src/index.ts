@@ -9,6 +9,7 @@ import posts from './routes/posts';
 import users from './routes/users';
 import sites from './routes/sites';
 import admin from './routes/admin';
+import comments from './routes/comments';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
 import type { Env } from './lib/auth';
@@ -19,7 +20,10 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:5173', 'https://thestack.cl'],
+    origin: (origin, c) => {
+      const allowed = [c.env.FRONTEND_URL, 'https://thestack.cl'].filter(Boolean);
+      return allowed.includes(origin) ? origin : allowed[0];
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -32,6 +36,7 @@ app.route('/api/posts', posts);
 app.route('/api/users', users);
 app.route('/api/sites', sites);
 app.route('/api/admin', admin);
+app.route('/api/comments', comments);
 
 app.get('/', (c) => {
   return c.json({

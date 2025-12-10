@@ -50,6 +50,16 @@
         new
       </a>
     </nav>
+
+    <!-- Keyboard hint -->
+    <button
+      type="button"
+      onclick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))}
+      class="hidden sm:flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors ml-2"
+      title="Atajos de teclado"
+    >
+      <kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-[10px] font-mono">?</kbd>
+    </button>
   </div>
 
   <div class="flex items-center">

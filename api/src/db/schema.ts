@@ -117,6 +117,50 @@ export const postUpvotes = sqliteTable(
   ]
 );
 
+export const comments = sqliteTable(
+  'comments',
+  {
+    id: text('id').primaryKey(),
+    postId: text('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: text('parent_id'),
+    content: text('content').notNull(),
+    upvotesCount: integer('upvotes_count').default(0).notNull(),
+    isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_comments_post').on(table.postId),
+    index('idx_comments_author').on(table.authorId),
+    index('idx_comments_parent').on(table.parentId),
+    index('idx_comments_created_at').on(table.createdAt),
+  ]
+);
+
+export const commentUpvotes = sqliteTable(
+  'comment_upvotes',
+  {
+    id: text('id').primaryKey(),
+    commentId: text('comment_id')
+      .notNull()
+      .references(() => comments.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_comment_upvotes_comment').on(table.commentId),
+    index('idx_comment_upvotes_user').on(table.userId),
+    uniqueIndex('idx_comment_upvotes_unique').on(table.commentId, table.userId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
@@ -125,3 +169,7 @@ export type Post = typeof posts.$inferSelect;
 export type NewPost = typeof posts.$inferInsert;
 export type PostUpvote = typeof postUpvotes.$inferSelect;
 export type NewPostUpvote = typeof postUpvotes.$inferInsert;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type CommentUpvote = typeof commentUpvotes.$inferSelect;
+export type NewCommentUpvote = typeof commentUpvotes.$inferInsert;
