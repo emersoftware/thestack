@@ -5,9 +5,8 @@ import type { Comment } from '$lib/comments';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
-  const [postRes, upvoteRes, commentsRes] = await Promise.all([
+  const [postRes, commentsRes] = await Promise.all([
     fetch(`${PUBLIC_API_URL}/api/posts/${params.id}`),
-    fetch(`${PUBLIC_API_URL}/api/posts/${params.id}/upvote/status`),
     fetch(`${PUBLIC_API_URL}/api/comments/post/${params.id}`)
   ]);
 
@@ -16,16 +15,12 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
   }
 
   const post: Post = await postRes.json();
-  const upvoteData = upvoteRes.ok
-    ? await upvoteRes.json() as { hasUpvoted: boolean }
-    : { hasUpvoted: false };
   const commentsData = commentsRes.ok
     ? await commentsRes.json() as { comments: Comment[] }
     : { comments: [] };
 
   return {
     post,
-    hasUpvoted: upvoteData.hasUpvoted,
     comments: commentsData.comments
   };
 };
