@@ -1,5 +1,6 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import type { RequestHandler } from './$types';
+import { ImageResponse } from '@ethercorps/sveltekit-og';
 
 export const GET: RequestHandler = async ({ params, fetch }) => {
   const postRes = await fetch(`${PUBLIC_API_URL}/api/posts/${params.id}`);
@@ -13,89 +14,39 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
   const domain = post.domain || '';
   const author = post.author?.username || '';
 
-  // Escape special characters for SVG
-  const escapeXml = (str: string) =>
-    str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+  const html = `
+    <div style="display: flex; flex-direction: column; width: 100%; height: 100%; background-color: #f5f5f5; padding: 60px;">
+      <div style="display: flex; align-items: center; margin-bottom: 40px;">
+        <div style="display: flex; flex-direction: column; width: 60px; height: 60px; background-color: #141414; border-radius: 9px; padding: 3px; gap: 3px;">
+          <div style="width: 30px; height: 9px; background-color: #f5f5f5; border-radius: 4.5px;"></div>
+          <div style="width: 30px; height: 9px; background-color: #f5f5f5; border-radius: 4.5px;"></div>
+          <div style="width: 30px; height: 13px; background-color: #f5f5f5; border-radius: 6px;"></div>
+          <div style="width: 30px; height: 20px; background-color: #f5f5f5; border-radius: 6px;"></div>
+        </div>
+        <span style="margin-left: 20px; font-size: 32px; font-weight: 600; color: #141414;">the stack</span>
+      </div>
 
-  // Word wrap function for title
-  const wrapText = (text: string, maxCharsPerLine: number): string[] => {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
+      <div style="display: flex; flex: 1; justify-content: center; align-items: center;">
+        <h1 style="font-size: 56px; font-weight: 700; color: #141414; text-align: center; margin: 0; max-width: 1000px; overflow-wrap: break-word;">${escapeHtml(title)}</h1>
+      </div>
 
-    for (const word of words) {
-      if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
-        currentLine = (currentLine + ' ' + word).trim();
-      } else {
-        if (currentLine) lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    if (currentLine) lines.push(currentLine);
+      <div style="display: flex; justify-content: center;">
+        <span style="font-size: 24px; color: #666666;">${domain ? escapeHtml(domain) : ''}${domain && author ? ' · ' : ''}${author ? '@' + escapeHtml(author) : ''}</span>
+      </div>
+    </div>
+  `;
 
-    // Limit to 3 lines max
-    if (lines.length > 3) {
-      lines.length = 3;
-      lines[2] = lines[2].slice(0, -3) + '...';
-    }
-
-    return lines;
-  };
-
-  const titleLines = wrapText(title, 35);
-  const titleY = 315 - (titleLines.length - 1) * 35;
-
-  const titleTspans = titleLines
-    .map(
-      (line, i) =>
-        `<tspan x="600" dy="${i === 0 ? 0 : 70}">${escapeXml(line)}</tspan>`
-    )
-    .join('');
-
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-  <!-- White background -->
-  <rect x="0" y="0" width="1200" height="630" fill="#f5f5f5"/>
-
-  <!-- Logo in top left (60x60, scaled 1.5x from 40x40) -->
-  <g transform="translate(60, 60)">
-    <defs>
-      <clipPath id="og-logo-mask">
-        <rect x="0" y="0" width="60" height="60" rx="9"/>
-      </clipPath>
-    </defs>
-    <rect x="0" y="0" width="60" height="60" rx="9" fill="#141414"/>
-    <g clip-path="url(#og-logo-mask)">
-      <rect x="3" y="3" width="30" height="9" rx="4.5" fill="#f5f5f5"/>
-      <rect x="3" y="15" width="30" height="9" rx="4.5" fill="#f5f5f5"/>
-      <rect x="3" y="27" width="30" height="13.5" rx="6" fill="#f5f5f5"/>
-      <rect x="3" y="43.5" width="30" height="45" rx="6" fill="#f5f5f5"/>
-    </g>
-  </g>
-
-  <!-- Site name next to logo -->
-  <text x="140" y="102" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#141414">the stack</text>
-
-  <!-- Post title centered -->
-  <text x="600" y="${titleY}" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="700" fill="#141414" text-anchor="middle" dominant-baseline="middle">
-    ${titleTspans}
-  </text>
-
-  <!-- Domain and author at bottom -->
-  <text x="600" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#666666" text-anchor="middle">
-    ${domain ? `<tspan>${escapeXml(domain)}</tspan>` : ''}${domain && author ? '<tspan> · </tspan>' : ''}${author ? `<tspan>@${escapeXml(author)}</tspan>` : ''}
-  </text>
-</svg>`;
-
-  return new Response(svg, {
-    headers: {
-      'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=3600'
-    }
+  return new ImageResponse(html, {
+    width: 1200,
+    height: 630
   });
 };
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

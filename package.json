@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@ethercorps/sveltekit-og": "^4.2.1"
+	}
+}

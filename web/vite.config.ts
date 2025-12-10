@@ -1,7 +1,8 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { sveltekitOG } from '@ethercorps/sveltekit-og/plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [sveltekit(), tailwindcss()]
+  plugins: [sveltekit(), tailwindcss(), sveltekitOG()]
 });
