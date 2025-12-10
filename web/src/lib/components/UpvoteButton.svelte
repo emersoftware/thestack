@@ -20,6 +20,7 @@
   disabled={disabled || loading}
   aria-pressed={active}
   aria-label="Upvote"
+  data-nav-upvote
   class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {active ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {loading ? 'animate-pulse' : ''}"
 >
   <svg

@@ -94,6 +94,8 @@
 </script>
 
 <article
+  data-nav-item
+  data-nav-id={post.id}
   class="bg-the-white rounded-xl py-3 pl-3 pr-3 sm:pl-4 border border-neutral-200 hover:border-the-black transition-colors duration-200 w-full sm:w-fit"
 >
   <div class="flex flex-col gap-2">
@@ -102,6 +104,7 @@
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
+        data-nav-link
         class="hover:underline text-the-black hover:text-neutral-600 text-sm leading-snug break-words sm:truncate sm:max-w-md"
       >
         {post.title}
@@ -125,6 +128,10 @@
       <span>·</span>
       <a href="/user/{post.author.username}" class="hover:text-the-black truncate max-w-[100px] sm:max-w-none">
         {post.author.username}
+      </a>
+      <span>·</span>
+      <a href="/post/{post.id}" data-nav-comments class="hover:text-the-black">
+        comentarios
       </a>
     </div>
   </div>

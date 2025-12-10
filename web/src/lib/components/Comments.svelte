@@ -69,6 +69,15 @@
       const comment = await createComment(postId, newComment.trim());
       comments = [...comments, comment];
       newComment = '';
+      // Focus on new comment
+      setTimeout(() => {
+        const el = document.querySelector(`[data-nav-id="${comment.id}"]`) as HTMLElement;
+        if (el) {
+          document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
+          el.setAttribute('data-nav-focus', 'true');
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(err.message);
@@ -94,6 +103,15 @@
       comments = [...comments, comment];
       replyContent = '';
       replyingTo = null;
+      // Focus on new reply
+      setTimeout(() => {
+        const el = document.querySelector(`[data-nav-id="${comment.id}"]`) as HTMLElement;
+        if (el) {
+          document.querySelectorAll('[data-nav-focus]').forEach(e => e.removeAttribute('data-nav-focus'));
+          el.setAttribute('data-nav-focus', 'true');
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(err.message);
@@ -183,18 +201,20 @@
   </div>
 
   <!-- New comment form -->
-  <form onsubmit={handleSubmit} class="mb-6">
+  <form onsubmit={handleSubmit} class="mb-6" data-nav-item>
     <div class="bg-the-white rounded-xl border border-neutral-200 focus-within:border-the-black transition-colors overflow-hidden">
       <textarea
         bind:value={newComment}
         placeholder={user ? 'Escribe un comentario...' : 'Inicia sesión para comentar'}
         disabled={!user || submitting}
         rows="3"
+        data-nav-textarea
         class="w-full px-4 py-3 text-sm bg-transparent focus:outline-none resize-none disabled:cursor-not-allowed placeholder:text-neutral-400"
       ></textarea>
       <div class="flex justify-end px-3 pb-3">
         <button
           type="submit"
+          data-nav-submit
           disabled={!user || !newComment.trim() || submitting}
           class="px-4 py-1.5 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
         >
@@ -223,6 +243,10 @@
   <div
     class="relative"
     style="margin-left: {Math.min(depth * 20, 60)}px"
+    data-nav-item
+    data-nav-id={comment.id}
+    data-nav-parent={comment.parentId || ''}
+    data-nav-depth={depth}
   >
     <!-- Thread line for nested comments -->
     {#if depth > 0}
@@ -255,6 +279,7 @@
             type="button"
             onclick={() => handleLike(comment.id)}
             disabled={likingComment === comment.id}
+            data-nav-upvote
             class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasLiked ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {likingComment === comment.id ? 'animate-pulse' : ''}"
           >
             <svg
@@ -271,6 +296,7 @@
           <button
             type="button"
             onclick={() => { replyingTo = replyingTo === comment.id ? null : comment.id; replyContent = ''; }}
+            data-nav-reply
             class="text-xs text-neutral-500 hover:text-the-black transition-colors flex items-center gap-1"
           >
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -298,6 +324,8 @@
               bind:value={replyContent}
               placeholder="Escribe una respuesta..."
               rows="2"
+              data-nav-textarea
+              data-nav-submit-id={comment.id}
               class="w-full px-3 py-2 text-sm bg-transparent focus:outline-none resize-none placeholder:text-neutral-400"
             ></textarea>
             <div class="flex gap-2 justify-end px-2 pb-2">
@@ -312,6 +340,7 @@
                 type="button"
                 onclick={() => handleReply(comment.id)}
                 disabled={!replyContent.trim() || submitting}
+                data-nav-submit={comment.id}
                 class="px-3 py-1 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
               >
                 {submitting ? '...' : 'Responder'}
