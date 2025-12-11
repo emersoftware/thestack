@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, desc, and } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
@@ -6,6 +7,10 @@ import * as schema from '../db/schema';
 import { requireAuth, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const users = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+
+const updateUserSchema = z.object({
+  about: z.string().max(500, 'Bio muy larga (max 500)').optional(),
+});
 
 users.get('/:username', async (c) => {
   const db = drizzle(c.env.DB, { schema });
@@ -118,7 +123,12 @@ users.put('/:username', requireAuth(), async (c) => {
     }
 
     const body = await c.req.json();
-    const about = body.about?.slice(0, 500) || '';
+    const validation = updateUserSchema.safeParse(body);
+    if (!validation.success) {
+      return c.json({ error: validation.error.issues[0].message }, 400);
+    }
+
+    const about = validation.data.about || '';
 
     await db
       .update(schema.users)

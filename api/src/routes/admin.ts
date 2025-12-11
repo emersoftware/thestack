@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, sql, desc } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
-import { requireAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
+import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -43,6 +43,7 @@ admin.get('/users', async (c) => {
         karma: schema.users.karma,
         isAdmin: schema.users.isAdmin,
         isBanned: schema.users.isBanned,
+        isSuperAdmin: schema.users.isSuperAdmin,
         createdAt: schema.users.createdAt,
       })
       .from(schema.users)
@@ -60,6 +61,16 @@ admin.put('/users/:id/promote', async (c) => {
   const userId = c.req.param('id');
 
   try {
+    const [targetUser] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
     await db
       .update(schema.users)
       .set({ isAdmin: true })
@@ -82,6 +93,23 @@ admin.put('/users/:id/demote', async (c) => {
   }
 
   try {
+    const [targetUser] = await db
+      .select({
+        id: schema.users.id,
+        isAdmin: schema.users.isAdmin,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
+    if (targetUser.isAdmin && !user.isSuperAdmin) {
+      return c.json({ error: 'Solo super-admin puede degradar a otros admins' }, 403);
+    }
+
     await db
       .update(schema.users)
       .set({ isAdmin: false })
@@ -104,6 +132,23 @@ admin.put('/users/:id/ban', async (c) => {
   }
 
   try {
+    const [targetUser] = await db
+      .select({
+        id: schema.users.id,
+        isAdmin: schema.users.isAdmin,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
+    if (targetUser.isAdmin && !user.isSuperAdmin) {
+      return c.json({ error: 'Solo super-admin puede banear a otros admins' }, 403);
+    }
+
     await db
       .update(schema.users)
       .set({ isBanned: true })
@@ -121,6 +166,16 @@ admin.put('/users/:id/unban', async (c) => {
   const userId = c.req.param('id');
 
   try {
+    const [targetUser] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
     await db
       .update(schema.users)
       .set({ isBanned: false })
@@ -202,6 +257,66 @@ admin.put('/posts/:id/restore', async (c) => {
   } catch (error) {
     console.error('Error restoring post:', error);
     return c.json({ error: 'Error al restaurar post' }, 500);
+  }
+});
+
+// Super-admin only endpoints
+admin.put('/users/:id/make-super-admin', requireSuperAdmin(), async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const userId = c.req.param('id');
+
+  try {
+    const [targetUser] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
+    await db
+      .update(schema.users)
+      .set({ isAdmin: true, isSuperAdmin: true })
+      .where(eq(schema.users.id, userId));
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error making super admin:', error);
+    return c.json({ error: 'Error al hacer super admin' }, 500);
+  }
+});
+
+admin.put('/users/:id/remove-super-admin', requireSuperAdmin(), async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const userId = c.req.param('id');
+  const user = c.get('user') as AuthUser;
+
+  if (userId === user.id) {
+    return c.json({ error: 'No puedes quitarte super-admin a ti mismo' }, 400);
+  }
+
+  try {
+    const [targetUser] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json({ error: 'Usuario no encontrado' }, 404);
+    }
+
+    await db
+      .update(schema.users)
+      .set({ isSuperAdmin: false })
+      .where(eq(schema.users.id, userId));
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error removing super admin:', error);
+    return c.json({ error: 'Error al quitar super admin' }, 500);
   }
 });
 

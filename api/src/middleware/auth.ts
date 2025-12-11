@@ -12,6 +12,7 @@ export type AuthUser = {
   karma: number;
   isAdmin: boolean;
   isBanned: boolean;
+  isSuperAdmin: boolean;
 };
 
 export type AuthVariables = {
@@ -46,6 +47,7 @@ export async function sessionMiddleware(
       karma: schema.users.karma,
       isAdmin: schema.users.isAdmin,
       isBanned: schema.users.isBanned,
+      isSuperAdmin: schema.users.isSuperAdmin,
     })
     .from(schema.users)
     .where(eq(schema.users.id, session.user.id))
@@ -64,6 +66,7 @@ export async function sessionMiddleware(
     karma: dbUser.karma ?? 0,
     isAdmin: dbUser.isAdmin ?? false,
     isBanned: dbUser.isBanned ?? false,
+    isSuperAdmin: dbUser.isSuperAdmin ?? false,
   });
 
   return next();
@@ -140,6 +143,33 @@ export function requireAdmin() {
 
     if (!user.isAdmin) {
       return c.json({ error: 'No autorizado' }, 403);
+    }
+
+    return next();
+  };
+}
+
+/**
+ * Middleware: Require super admin privileges
+ * Returns 401 if not authenticated, 403 if banned or not super admin
+ */
+export function requireSuperAdmin() {
+  return async (
+    c: Context<{ Bindings: Env; Variables: AuthVariables }>,
+    next: Next
+  ) => {
+    const user = c.get('user');
+
+    if (!user) {
+      return c.json({ error: 'No autenticado' }, 401);
+    }
+
+    if (user.isBanned) {
+      return c.json({ error: 'Tu cuenta ha sido suspendida' }, 403);
+    }
+
+    if (!user.isSuperAdmin) {
+      return c.json({ error: 'Requiere privilegios de super admin' }, 403);
     }
 
     return next();

@@ -10,7 +10,7 @@ import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } 
 const comments = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 const createCommentSchema = z.object({
-  content: z.string().min(1, 'Comentario requerido').max(10000, 'Comentario muy largo'),
+  content: z.string().min(1, 'Comentario requerido').max(5000, 'Comentario muy largo (max 5000)'),
   parentId: z.string().optional(),
 });
 
@@ -178,24 +178,33 @@ comments.post('/post/:postId', requireVerifiedEmail(), async (c) => {
     const now = new Date();
     const commentId = generateId();
 
-    await db.insert(schema.comments).values({
-      id: commentId,
-      postId,
-      authorId: user.id,
-      parentId: parentId || null,
-      content,
-      upvotesCount: 1,
-      isDeleted: false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    // Use transaction for atomicity
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.comments).values({
+        id: commentId,
+        postId,
+        authorId: user.id,
+        parentId: parentId || null,
+        content,
+        upvotesCount: 1,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    // Auto-like own comment (like posts)
-    await db.insert(schema.commentUpvotes).values({
-      id: generateId(),
-      commentId,
-      userId: user.id,
-      createdAt: now,
+      // Auto-like own comment (like posts)
+      await tx.insert(schema.commentUpvotes).values({
+        id: generateId(),
+        commentId,
+        userId: user.id,
+        createdAt: now,
+      });
+
+      // Update karma for auto-upvote (consistent with posts)
+      await tx
+        .update(schema.users)
+        .set({ karma: sql`${schema.users.karma} + 1` })
+        .where(eq(schema.users.id, user.id));
     });
 
     const created = await db
