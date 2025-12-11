@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Comment } from '$lib/comments';
-  import { createComment, deleteComment, toggleCommentUpvote } from '$lib/comments';
+  import { createComment, deleteComment, toggleCommentUpvote, getMyCommentUpvotes } from '$lib/comments';
   import { useSession } from '$lib/auth';
   import { goto } from '$app/navigation';
   import { toast } from '$lib/toast';
@@ -19,6 +19,25 @@
   let submitting = $state(false);
   let upvotingComment = $state<string | null>(null);
   let deletingCommentId = $state<string | null>(null);
+  let upvotesLoaded = $state(false);
+
+  // Load user's upvoted comments client-side (requires auth cookies)
+  $effect(() => {
+    if (user && !upvotesLoaded) {
+      upvotesLoaded = true;
+      getMyCommentUpvotes(postId)
+        .then((upvotedIds) => {
+          const upvotedSet = new Set(upvotedIds);
+          comments = comments.map((c) => ({
+            ...c,
+            hasUpvoted: upvotedSet.has(c.id)
+          }));
+        })
+        .catch(() => {
+          // Silently fail - upvotes will show as false
+        });
+    }
+  });
 
   // Build tree structure from flat comments
   const commentTree = $derived.by(() => {

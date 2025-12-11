@@ -50,3 +50,8 @@ export async function toggleCommentUpvote(commentId: string): Promise<CommentUpv
     method: 'POST',
   });
 }
+
+export async function getMyCommentUpvotes(postId: string): Promise<string[]> {
+  const response = await apiFetch<{ commentIds: string[] }>(`/api/comments/my-upvotes/${postId}`);
+  return response.commentIds;
+}

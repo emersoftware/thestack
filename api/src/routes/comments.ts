@@ -19,6 +19,47 @@ async function getSession(c: { env: Env; req: { raw: Request } }) {
   return session;
 }
 
+// Get user's upvoted comment IDs for a post (must be before /post/:postId to avoid route collision)
+comments.get('/my-upvotes/:postId', async (c) => {
+  const session = await getSession(c);
+  if (!session?.user) {
+    return c.json({ commentIds: [] });
+  }
+
+  const db = drizzle(c.env.DB, { schema });
+  const postId = c.req.param('postId');
+
+  try {
+    // Get all comment IDs for this post
+    const postComments = await db
+      .select({ id: schema.comments.id })
+      .from(schema.comments)
+      .where(eq(schema.comments.postId, postId));
+
+    const commentIds = postComments.map((c) => c.id);
+
+    if (commentIds.length === 0) {
+      return c.json({ commentIds: [] });
+    }
+
+    // Get user's upvotes for these comments
+    const upvotes = await db
+      .select({ commentId: schema.commentUpvotes.commentId })
+      .from(schema.commentUpvotes)
+      .where(
+        and(
+          eq(schema.commentUpvotes.userId, session.user.id),
+          inArray(schema.commentUpvotes.commentId, commentIds)
+        )
+      );
+
+    return c.json({ commentIds: upvotes.map((u) => u.commentId) });
+  } catch (error) {
+    console.error('Error fetching user comment upvotes:', error);
+    return c.json({ error: 'Error al obtener votos' }, 500);
+  }
+});
+
 // Get comments for a post
 comments.get('/post/:postId', async (c) => {
   const db = drizzle(c.env.DB, { schema });
