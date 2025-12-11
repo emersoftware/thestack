@@ -105,6 +105,7 @@ export const createAuth = (env: Env) => {
         karma: {
           type: 'number',
           defaultValue: 0,
+          input: false,
         },
         about: {
           type: 'string',
@@ -113,10 +114,12 @@ export const createAuth = (env: Env) => {
         isAdmin: {
           type: 'boolean',
           defaultValue: false,
+          input: false,
         },
         isBanned: {
           type: 'boolean',
           defaultValue: false,
+          input: false,
         },
       },
     },
