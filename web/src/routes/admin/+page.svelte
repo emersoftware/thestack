@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { useSession, type CustomUser } from '$lib/auth';
   import {
     getAdminStats,
     getAdminUsers,
@@ -17,8 +16,9 @@
     type AdminPost,
   } from '$lib/admin';
 
-  const session = useSession();
-  const user = $derived($session.data?.user as CustomUser | undefined);
+  // User is guaranteed to be admin by server-side load (redirects if not)
+  let { data } = $props();
+  const user = data.user!;
 
   let activeTab = $state<'stats' | 'users' | 'posts'>('stats');
   let stats = $state<AdminStats | null>(null);
@@ -80,17 +80,7 @@
   }
 
   onMount(() => {
-    if (user && !user.isAdmin) {
-      goto('/');
-    } else {
-      loadData();
-    }
-  });
-
-  $effect(() => {
-    if (!$session.isPending && user && !user.isAdmin) {
-      goto('/');
-    }
+    loadData();
   });
 </script>
 

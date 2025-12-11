@@ -4,11 +4,11 @@
   import Toast from '$lib/components/Toast.svelte';
   import KeyboardNav from '$lib/components/KeyboardNav.svelte';
 
-  let { children } = $props();
+  let { children, data } = $props();
 </script>
 
 <div class="min-h-screen p-2 sm:p-3 bg-the-white flex flex-col">
-  <Header />
+  <Header user={data.user} />
   {@render children()}
 </div>
 

@@ -13,8 +13,9 @@ import comments from './routes/comments';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
 import type { Env } from './lib/auth';
+import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 app.use('*', logger());
 app.use(
@@ -29,6 +30,14 @@ app.use(
     credentials: true,
   })
 );
+
+// Apply session middleware to routes that need user context
+// NOT to /api/auth/* (better-auth handles its own routes)
+app.use('/api/posts/*', sessionMiddleware);
+app.use('/api/comments/*', sessionMiddleware);
+app.use('/api/users/*', sessionMiddleware);
+app.use('/api/admin/*', sessionMiddleware);
+app.use('/api/sites/*', sessionMiddleware);
 
 app.route('/api/health', health);
 app.route('/api/auth', auth);

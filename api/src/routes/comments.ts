@@ -2,27 +2,22 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, inArray, sql, gte } from 'drizzle-orm';
-import { createAuth, type Env } from '../lib/auth';
+import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { generateId } from '../lib/utils';
+import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
-const comments = new Hono<{ Bindings: Env }>();
+const comments = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 const createCommentSchema = z.object({
   content: z.string().min(1, 'Comentario requerido').max(10000, 'Comentario muy largo'),
   parentId: z.string().optional(),
 });
 
-async function getSession(c: { env: Env; req: { raw: Request } }) {
-  const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  return session;
-}
-
 // Get user's upvoted comment IDs for a post (must be before /post/:postId to avoid route collision)
 comments.get('/my-upvotes/:postId', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
+  const user = c.get('user');
+  if (!user) {
     return c.json({ commentIds: [] });
   }
 
@@ -48,7 +43,7 @@ comments.get('/my-upvotes/:postId', async (c) => {
       .from(schema.commentUpvotes)
       .where(
         and(
-          eq(schema.commentUpvotes.userId, session.user.id),
+          eq(schema.commentUpvotes.userId, user.id),
           inArray(schema.commentUpvotes.commentId, commentIds)
         )
       );
@@ -64,7 +59,7 @@ comments.get('/my-upvotes/:postId', async (c) => {
 comments.get('/post/:postId', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const postId = c.req.param('postId');
-  const session = await getSession(c);
+  const user = c.get('user');
 
   try {
     const result = await db
@@ -86,7 +81,7 @@ comments.get('/post/:postId', async (c) => {
 
     // Get user's liked comment IDs if logged in
     let myLikedIds: Set<string> = new Set();
-    if (session?.user) {
+    if (user) {
       const commentIds = result.map((c) => c.id);
       if (commentIds.length > 0) {
         const myLikes = await db
@@ -94,7 +89,7 @@ comments.get('/post/:postId', async (c) => {
           .from(schema.commentUpvotes)
           .where(
             and(
-              eq(schema.commentUpvotes.userId, session.user.id),
+              eq(schema.commentUpvotes.userId, user.id),
               inArray(schema.commentUpvotes.commentId, commentIds)
             )
           );
@@ -124,16 +119,9 @@ comments.get('/post/:postId', async (c) => {
   }
 });
 
-// Create a comment
-comments.post('/post/:postId', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión para comentar' }, 401);
-  }
-
-  if (!session.user.emailVerified) {
-    return c.json({ error: 'Debes verificar tu email para comentar' }, 403);
-  }
+// Create a comment - middleware checks auth + email verified + ban status
+comments.post('/post/:postId', requireVerifiedEmail(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const postId = c.req.param('postId');
@@ -145,7 +133,7 @@ comments.post('/post/:postId', async (c) => {
     .from(schema.comments)
     .where(
       and(
-        eq(schema.comments.authorId, session.user.id),
+        eq(schema.comments.authorId, user.id),
         gte(schema.comments.createdAt, oneHourAgo)
       )
     );
@@ -193,7 +181,7 @@ comments.post('/post/:postId', async (c) => {
     await db.insert(schema.comments).values({
       id: commentId,
       postId,
-      authorId: session.user.id,
+      authorId: user.id,
       parentId: parentId || null,
       content,
       upvotesCount: 1,
@@ -206,7 +194,7 @@ comments.post('/post/:postId', async (c) => {
     await db.insert(schema.commentUpvotes).values({
       id: generateId(),
       commentId,
-      userId: session.user.id,
+      userId: user.id,
       createdAt: now,
     });
 
@@ -248,12 +236,9 @@ comments.post('/post/:postId', async (c) => {
   }
 });
 
-// Delete a comment (soft delete)
-comments.delete('/:id', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión' }, 401);
-  }
+// Delete a comment (soft delete) - middleware checks auth + ban status
+comments.delete('/:id', requireAuth(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const commentId = c.req.param('id');
@@ -270,8 +255,7 @@ comments.delete('/:id', async (c) => {
     }
 
     const comment = existing[0];
-    const user = session.user as { id: string; isAdmin?: boolean };
-
+    // Now user.isAdmin is reliably from the database via middleware
     if (comment.authorId !== user.id && !user.isAdmin) {
       return c.json({ error: 'No tienes permiso para eliminar este comentario' }, 403);
     }
@@ -288,20 +272,13 @@ comments.delete('/:id', async (c) => {
   }
 });
 
-// Toggle upvote on a comment
-comments.post('/:id/upvote', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión para votar' }, 401);
-  }
-
-  if (!session.user.emailVerified) {
-    return c.json({ error: 'Debes verificar tu email para votar' }, 403);
-  }
+// Toggle upvote on a comment - middleware checks auth + email verified + ban status
+comments.post('/:id/upvote', requireVerifiedEmail(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const commentId = c.req.param('id');
-  const userId = session.user.id;
+  const userId = user.id;
 
   try {
     const existing = await db
