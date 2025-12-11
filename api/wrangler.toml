@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+port = 8787
+
 # D1 Database binding (local por defecto para desarrollo)
 [[d1_databases]]
 binding = "DB"
