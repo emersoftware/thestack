@@ -1,39 +1,14 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, sql, desc } from 'drizzle-orm';
-import { createAuth, type Env } from '../lib/auth';
+import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
+import { requireAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
 
-type Variables = {
-  adminUser: { id: string };
-};
+const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
-const admin = new Hono<{ Bindings: Env; Variables: Variables }>();
-
-async function requireAdmin(c: any, next: any) {
-  const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-
-  if (!session?.user) {
-    return c.json({ error: 'No autenticado' }, 401);
-  }
-
-  const db = drizzle(c.env.DB, { schema });
-  const user = await db
-    .select({ isAdmin: schema.users.isAdmin })
-    .from(schema.users)
-    .where(eq(schema.users.id, session.user.id))
-    .limit(1);
-
-  if (!user[0]?.isAdmin) {
-    return c.json({ error: 'No autorizado' }, 403);
-  }
-
-  c.set('adminUser', session.user);
-  await next();
-}
-
-admin.use('*', requireAdmin);
+// Apply admin middleware to all routes - sessionMiddleware already ran in index.ts
+admin.use('*', requireAdmin());
 
 admin.get('/stats', async (c) => {
   const db = drizzle(c.env.DB, { schema });
@@ -100,9 +75,9 @@ admin.put('/users/:id/promote', async (c) => {
 admin.put('/users/:id/demote', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const userId = c.req.param('id');
-  const adminUser = c.get('adminUser');
+  const user = c.get('user') as AuthUser;
 
-  if (userId === adminUser.id) {
+  if (userId === user.id) {
     return c.json({ error: 'No puedes degradarte a ti mismo' }, 400);
   }
 
@@ -122,9 +97,9 @@ admin.put('/users/:id/demote', async (c) => {
 admin.put('/users/:id/ban', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const userId = c.req.param('id');
-  const adminUser = c.get('adminUser');
+  const user = c.get('user') as AuthUser;
 
-  if (userId === adminUser.id) {
+  if (userId === user.id) {
     return c.json({ error: 'No puedes banearte a ti mismo' }, 400);
   }
 

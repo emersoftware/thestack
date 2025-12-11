@@ -2,22 +2,17 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, desc, and, sql, gte } from 'drizzle-orm';
-import { createAuth, type Env } from '../lib/auth';
+import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { extractDomain, generateId, isValidUrl, calculateHNScore } from '../lib/utils';
+import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
-const posts = new Hono<{ Bindings: Env }>();
+const posts = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 const createPostSchema = z.object({
   title: z.string().min(1, 'Título requerido').max(300, 'Título muy largo (max 300)'),
   url: z.string().url('URL inválida').refine(isValidUrl, 'URL debe ser http o https'),
 });
-
-async function getSession(c: { env: Env; req: { raw: Request } }) {
-  const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  return session;
-}
 
 posts.get('/', async (c) => {
   const db = drizzle(c.env.DB, { schema });
@@ -76,8 +71,8 @@ posts.get('/', async (c) => {
 
 // must be defined before /:id to avoid route collision
 posts.get('/my-upvotes', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
+  const user = c.get('user');
+  if (!user) {
     return c.json({ postIds: [] });
   }
 
@@ -87,7 +82,7 @@ posts.get('/my-upvotes', async (c) => {
     const upvotes = await db
       .select({ postId: schema.postUpvotes.postId })
       .from(schema.postUpvotes)
-      .where(eq(schema.postUpvotes.userId, session.user.id));
+      .where(eq(schema.postUpvotes.userId, user.id));
 
     return c.json({ postIds: upvotes.map((u) => u.postId) });
   } catch (error) {
@@ -142,15 +137,9 @@ posts.get('/:id', async (c) => {
   }
 });
 
-posts.post('/', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión para publicar' }, 401);
-  }
-
-  if (!session.user.emailVerified) {
-    return c.json({ error: 'Debes verificar tu email para publicar' }, 403);
-  }
+// Middleware checks auth + email verified + ban status
+posts.post('/', requireVerifiedEmail(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const TEN_MINUTES = 10 * 60 * 1000;
@@ -159,7 +148,7 @@ posts.post('/', async (c) => {
     .from(schema.posts)
     .where(
       and(
-        eq(schema.posts.authorId, session.user.id),
+        eq(schema.posts.authorId, user.id),
         gte(schema.posts.createdAt, new Date(Date.now() - TEN_MINUTES))
       )
     )
@@ -175,7 +164,7 @@ posts.post('/', async (c) => {
     .from(schema.posts)
     .where(
       and(
-        eq(schema.posts.authorId, session.user.id),
+        eq(schema.posts.authorId, user.id),
         gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY))
       )
     );
@@ -222,7 +211,7 @@ posts.post('/', async (c) => {
       title,
       url,
       domain,
-      authorId: session.user.id,
+      authorId: user.id,
       upvotesCount: 1,
       score: initialScore,
       isDeleted: false,
@@ -233,14 +222,14 @@ posts.post('/', async (c) => {
     await db.insert(schema.postUpvotes).values({
       id: generateId(),
       postId,
-      userId: session.user.id,
+      userId: user.id,
       createdAt: now,
     });
 
     await db
       .update(schema.users)
       .set({ karma: sql`${schema.users.karma} + 1` })
-      .where(eq(schema.users.id, session.user.id));
+      .where(eq(schema.users.id, user.id));
 
     const createdPost = await db
       .select({
@@ -279,11 +268,9 @@ posts.post('/', async (c) => {
   }
 });
 
-posts.delete('/:id', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión' }, 401);
-  }
+// Middleware checks auth + ban status
+posts.delete('/:id', requireAuth(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const postId = c.req.param('id');
@@ -300,7 +287,7 @@ posts.delete('/:id', async (c) => {
     }
 
     const post = existingPost[0];
-    const user = session.user as { id: string; isAdmin?: boolean };
+    // Now user.isAdmin is reliably from the database via middleware
     if (post.authorId !== user.id && !user.isAdmin) {
       return c.json({ error: 'No tienes permiso para eliminar este post' }, 403);
     }
@@ -317,19 +304,13 @@ posts.delete('/:id', async (c) => {
   }
 });
 
-posts.post('/:id/upvote', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
-    return c.json({ error: 'Debes iniciar sesión para votar' }, 401);
-  }
-
-  if (!session.user.emailVerified) {
-    return c.json({ error: 'Debes verificar tu email para votar' }, 403);
-  }
+// Middleware checks auth + email verified + ban status
+posts.post('/:id/upvote', requireVerifiedEmail(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const postId = c.req.param('id');
-  const userId = session.user.id;
+  const userId = user.id;
 
   try {
     const existingPost = await db
@@ -436,8 +417,8 @@ posts.post('/:id/upvote', async (c) => {
 });
 
 posts.get('/:id/upvote/status', async (c) => {
-  const session = await getSession(c);
-  if (!session?.user) {
+  const user = c.get('user');
+  if (!user) {
     return c.json({ hasUpvoted: false });
   }
 
@@ -451,7 +432,7 @@ posts.get('/:id/upvote/status', async (c) => {
       .where(
         and(
           eq(schema.postUpvotes.postId, postId),
-          eq(schema.postUpvotes.userId, session.user.id)
+          eq(schema.postUpvotes.userId, user.id)
         )
       )
       .limit(1);

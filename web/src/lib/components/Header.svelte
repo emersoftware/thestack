@@ -4,9 +4,16 @@
   import { page } from '$app/stores';
   import Logo from './Logo.svelte';
 
+  // Server-side loaded user (for initial render without flash)
+  let { user: serverUser }: { user: CustomUser | null } = $props();
+
+  // Client-side session (for real-time updates after login/logout)
   const session = useSession();
 
-  const user = $derived($session.data?.user as CustomUser | undefined);
+  // Prefer client session if available and not pending, otherwise use server data
+  const user = $derived(
+    $session.isPending ? serverUser : ($session.data?.user as CustomUser | undefined) ?? serverUser
+  );
   const pathname = $derived($page.url.pathname);
 
   let dropdownOpen = $state(false);
@@ -63,7 +70,7 @@
   </div>
 
   <div class="flex items-center">
-    {#if !$session.isPending && user}
+    {#if user}
       <!-- Desktop: links horizontales -->
       <div class="hidden md:flex items-center space-x-3">
         {#if pathname !== '/submit'}
@@ -127,7 +134,7 @@
           </div>
         {/if}
       </div>
-    {:else if !$session.isPending && !user && pathname !== '/login' && pathname !== '/register'}
+    {:else if !user && pathname !== '/login' && pathname !== '/register'}
       <a
         href="/login"
         class="text-neutral-700 px-3 py-1 rounded-full text-sm font-medium border border-neutral-300 hover:border-the-black hover:text-the-black transition-colors"

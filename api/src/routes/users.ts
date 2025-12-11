@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, desc, and } from 'drizzle-orm';
-import { createAuth, type Env } from '../lib/auth';
+import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
+import { requireAuth, type AuthVariables, type AuthUser } from '../middleware/auth';
 
-const users = new Hono<{ Bindings: Env }>();
+const users = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 users.get('/:username', async (c) => {
   const db = drizzle(c.env.DB, { schema });
@@ -103,25 +104,16 @@ users.get('/:username/posts', async (c) => {
   }
 });
 
-users.put('/:username', async (c) => {
-  const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-
-  if (!session?.user) {
-    return c.json({ error: 'No autenticado' }, 401);
-  }
+// Middleware checks auth + ban status
+users.put('/:username', requireAuth(), async (c) => {
+  const user = c.get('user') as AuthUser;
 
   const db = drizzle(c.env.DB, { schema });
   const username = c.req.param('username');
 
   try {
-    const currentUser = await db
-      .select({ username: schema.users.username })
-      .from(schema.users)
-      .where(eq(schema.users.id, session.user.id))
-      .limit(1);
-
-    if (currentUser[0]?.username !== username) {
+    // Check if user is editing their own profile
+    if (user.username !== username) {
       return c.json({ error: 'No puedes editar otro perfil' }, 403);
     }
 
@@ -131,7 +123,7 @@ users.put('/:username', async (c) => {
     await db
       .update(schema.users)
       .set({ about, updatedAt: new Date() })
-      .where(eq(schema.users.id, session.user.id));
+      .where(eq(schema.users.id, user.id));
 
     return c.json({ success: true, about });
   } catch (error) {

@@ -11,6 +11,7 @@ database_id = "local"
 
 [vars]
 ENVIRONMENT = "development"
+FRONTEND_URL = "http://localhost:5173"
 
 # ============================================
 # Production environment
