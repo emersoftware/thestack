@@ -28,6 +28,7 @@ database_id = "2fab040d-8589-4f40-9401-aa4da7cc4d51"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+FRONTEND_URL = "https://thestack.cl"
 
 [env.production.triggers]
 crons = ["*/10 * * * *"]
