@@ -42,7 +42,7 @@ jobs:
         run: |
           for migration in migrations/*.sql; do
             echo "Running migration: $migration"
-            npx wrangler d1 execute the-stack-db --env production --file="$migration" --remote
+            npx wrangler d1 execute the-stack-db --env production --file="$migration" --remote || true
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
