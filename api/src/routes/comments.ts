@@ -294,55 +294,69 @@ comments.post('/:id/upvote', async (c) => {
     let newCount: number;
 
     if (existingLike.length > 0) {
-      // Remove like
-      await db
+      // Use returning to verify the delete actually removed a row (race condition protection)
+      const deleted = await db
         .delete(schema.commentUpvotes)
         .where(
           and(
             eq(schema.commentUpvotes.commentId, commentId),
             eq(schema.commentUpvotes.userId, userId)
           )
-        );
+        )
+        .returning({ id: schema.commentUpvotes.id });
 
-      await db
-        .update(schema.comments)
-        .set({
-          upvotesCount: sql`${schema.comments.upvotesCount} - 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.comments.id, commentId));
+      // Only decrement if we actually deleted something
+      if (deleted.length > 0) {
+        await db
+          .update(schema.comments)
+          .set({
+            upvotesCount: sql`CASE WHEN ${schema.comments.upvotesCount} > 0 THEN ${schema.comments.upvotesCount} - 1 ELSE 0 END`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.comments.id, commentId));
 
-      await db
-        .update(schema.users)
-        .set({ karma: sql`${schema.users.karma} - 1` })
-        .where(eq(schema.users.id, comment.authorId));
+        await db
+          .update(schema.users)
+          .set({ karma: sql`${schema.users.karma} - 1` })
+          .where(eq(schema.users.id, comment.authorId));
+      }
 
       hasUpvoted = false;
-      newCount = comment.upvotesCount - 1;
+      newCount = Math.max(0, comment.upvotesCount - 1);
     } else {
-      // Add like
-      await db.insert(schema.commentUpvotes).values({
-        id: generateId(),
-        commentId,
-        userId,
-        createdAt: new Date(),
-      });
+      // Use try-catch to handle unique constraint violation (race condition protection)
+      try {
+        await db.insert(schema.commentUpvotes).values({
+          id: generateId(),
+          commentId,
+          userId,
+          createdAt: new Date(),
+        });
 
-      await db
-        .update(schema.comments)
-        .set({
-          upvotesCount: sql`${schema.comments.upvotesCount} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.comments.id, commentId));
+        await db
+          .update(schema.comments)
+          .set({
+            upvotesCount: sql`${schema.comments.upvotesCount} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.comments.id, commentId));
 
-      await db
-        .update(schema.users)
-        .set({ karma: sql`${schema.users.karma} + 1` })
-        .where(eq(schema.users.id, comment.authorId));
+        await db
+          .update(schema.users)
+          .set({ karma: sql`${schema.users.karma} + 1` })
+          .where(eq(schema.users.id, comment.authorId));
 
-      hasUpvoted = true;
-      newCount = comment.upvotesCount + 1;
+        hasUpvoted = true;
+        newCount = comment.upvotesCount + 1;
+      } catch (insertError: unknown) {
+        // If insert fails due to unique constraint, the upvote already exists (race condition)
+        if (insertError instanceof Error && insertError.message.includes('UNIQUE constraint')) {
+          hasUpvoted = true;
+          newCount = comment.upvotesCount;
+        } else {
+          throw insertError;
+        }
+      }
     }
 
     return c.json({ hasUpvoted, upvotesCount: newCount });
