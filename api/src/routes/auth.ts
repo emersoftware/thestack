@@ -90,34 +90,32 @@ function removeStateCookies(cookieHeader: string | null): string {
 auth.on(['GET', 'POST'], '/*', async (c) => {
   const authInstance = createAuth(c.env);
 
+  // TEMPORARY: Cookie filtering for cross-subdomain migration
+  // Can be removed after 2025-12-18
   if (c.env.ENVIRONMENT === 'production') {
     const originalCookies = c.req.raw.headers.get('cookie');
-    let processedCookies = originalCookies;
 
-    // For sign-in routes: remove ALL state cookies so Better Auth creates a fresh one
-    // This prevents state_mismatch when old cookies exist on api.thestack.cl
-    if (c.req.path.includes('/sign-in/')) {
-      processedCookies = removeStateCookies(originalCookies);
-    } else {
-      // For other routes (callback, get-session, etc): just filter duplicates
-      processedCookies = filterDuplicateCookies(originalCookies);
-    }
+    // Only process if there are actual cookies
+    if (originalCookies) {
+      let processedCookies: string;
 
-    // Only create new request if cookies were actually modified
-    if (processedCookies !== originalCookies) {
-      // Clone the request first - body is a ReadableStream that can only be read once
-      const clonedRequest = c.req.raw.clone();
-      const newHeaders = new Headers(clonedRequest.headers);
-      newHeaders.set('cookie', processedCookies || '');
+      // For sign-in routes: remove ALL state cookies so Better Auth creates a fresh one
+      if (c.req.path.includes('/sign-in/')) {
+        processedCookies = removeStateCookies(originalCookies);
+      } else {
+        // For other routes (callback, get-session, etc): just filter duplicates
+        processedCookies = filterDuplicateCookies(originalCookies);
+      }
 
-      const newRequest = new Request(clonedRequest.url, {
-        method: clonedRequest.method,
-        headers: newHeaders,
-        body: clonedRequest.body,
-        redirect: clonedRequest.redirect,
-      });
+      // Only create new request if cookies were actually modified
+      if (processedCookies && processedCookies !== originalCookies) {
+        const newHeaders = new Headers(c.req.raw.headers);
+        newHeaders.set('cookie', processedCookies);
 
-      return authInstance.handler(newRequest);
+        // Use Request constructor with existing request as base - handles body cloning internally
+        const newRequest = new Request(c.req.raw, { headers: newHeaders });
+        return authInstance.handler(newRequest);
+      }
     }
   }
 
