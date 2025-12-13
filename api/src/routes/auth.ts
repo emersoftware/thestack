@@ -105,14 +105,16 @@ auth.on(['GET', 'POST'], '/*', async (c) => {
 
     // Only create new request if cookies were actually modified
     if (processedCookies !== originalCookies) {
-      const newHeaders = new Headers(c.req.raw.headers);
+      // Clone the request first - body is a ReadableStream that can only be read once
+      const clonedRequest = c.req.raw.clone();
+      const newHeaders = new Headers(clonedRequest.headers);
       newHeaders.set('cookie', processedCookies || '');
 
-      const newRequest = new Request(c.req.raw.url, {
-        method: c.req.raw.method,
+      const newRequest = new Request(clonedRequest.url, {
+        method: clonedRequest.method,
         headers: newHeaders,
-        body: c.req.raw.body,
-        redirect: c.req.raw.redirect,
+        body: clonedRequest.body,
+        redirect: clonedRequest.redirect,
       });
 
       return authInstance.handler(newRequest);
