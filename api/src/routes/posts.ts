@@ -206,9 +206,9 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     const postId = generateId();
     const initialScore = calculateHNScore(1, now);
 
-    // Use transaction for atomicity
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.posts).values({
+    // Use batch for atomicity (D1 doesn't support transactions)
+    await db.batch([
+      db.insert(schema.posts).values({
         id: postId,
         title,
         url,
@@ -219,20 +219,18 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
         isDeleted: false,
         createdAt: now,
         updatedAt: now,
-      });
-
-      await tx.insert(schema.postUpvotes).values({
+      }),
+      db.insert(schema.postUpvotes).values({
         id: generateId(),
         postId,
         userId: user.id,
         createdAt: now,
-      });
-
-      await tx
+      }),
+      db
         .update(schema.users)
         .set({ karma: sql`${schema.users.karma} + 1` })
-        .where(eq(schema.users.id, user.id));
-    });
+        .where(eq(schema.users.id, user.id)),
+    ]);
 
     const createdPost = await db
       .select({

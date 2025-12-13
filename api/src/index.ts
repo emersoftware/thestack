@@ -18,6 +18,44 @@ import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 app.use('*', logger());
+
+// TEMPORARY: Expire old cookies on api.thestack.cl domain
+// Can be removed after 2025-12-18
+// Note: Cookie filtering for auth routes is handled in routes/auth.ts
+app.use('*', async (c, next) => {
+  await next();
+
+  if (c.env.ENVIRONMENT === 'production') {
+    // Expire old session cookies on api.thestack.cl
+    // Try both with and without Domain attribute to handle host-only cookies
+    c.header(
+      'Set-Cookie',
+      '__Secure-better-auth.session_token=; Path=/; Domain=api.thestack.cl; Max-Age=0; Secure; HttpOnly; SameSite=Lax',
+      { append: true }
+    );
+    c.header(
+      'Set-Cookie',
+      '__Secure-better-auth.session_token=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax',
+      { append: true }
+    );
+
+    // Expire state cookie everywhere EXCEPT callback routes
+    if (!c.req.path.includes('/callback/')) {
+      // Try both with and without Domain attribute to handle host-only cookies
+      c.header(
+        'Set-Cookie',
+        '__Secure-better-auth.state=; Path=/; Domain=api.thestack.cl; Max-Age=0; Secure; HttpOnly; SameSite=Lax',
+        { append: true }
+      );
+      c.header(
+        'Set-Cookie',
+        '__Secure-better-auth.state=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax',
+        { append: true }
+      );
+    }
+  }
+});
+
 app.use(
   '*',
   cors({

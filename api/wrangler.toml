@@ -35,3 +35,10 @@ FRONTEND_URL = "https://thestack.cl"
 
 [env.production.triggers]
 crons = ["*/10 * * * *"]
+
+[env.production.observability]
+[env.production.observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true

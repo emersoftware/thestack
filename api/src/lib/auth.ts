@@ -132,7 +132,14 @@ export const createAuth = (env: Env) => {
       },
     },
 
-    trustedOrigins: ['http://localhost:5173', 'https://thestack.cl'],
+    advanced: {
+      crossSubDomainCookies: {
+        enabled: env.ENVIRONMENT === 'production',
+        domain: '.thestack.cl',
+      },
+    },
+
+    trustedOrigins: [env.FRONTEND_URL, 'https://thestack.cl'],
   });
 };
 

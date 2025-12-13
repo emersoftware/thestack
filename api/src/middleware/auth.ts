@@ -20,6 +20,34 @@ export type AuthVariables = {
 };
 
 /**
+ * Filters duplicate cookies from the Cookie header.
+ * When multiple cookies with the same name exist (e.g., from different domains),
+ * keeps only the FIRST occurrence.
+ * TEMPORARY: Can be removed after 2025-12-18
+ *
+ * Why FIRST: The new cross-subdomain cookies on .thestack.cl are typically sent
+ * before old host-only cookies on api.thestack.cl by Safari and most browsers.
+ */
+function filterDuplicateCookies(cookieHeader: string | null | undefined): string {
+  if (!cookieHeader) return '';
+
+  const cookieMap = new Map<string, string>();
+
+  for (const cookie of cookieHeader.split(';')) {
+    const trimmed = cookie.trim();
+    const name = trimmed.split('=')[0];
+    if (name) {
+      // Only set if not already present (first wins)
+      if (!cookieMap.has(name)) {
+        cookieMap.set(name, trimmed);
+      }
+    }
+  }
+
+  return Array.from(cookieMap.values()).join('; ');
+}
+
+/**
  * Session middleware - loads session and fresh user data from DB
  * Attaches user to context (or null if unauthenticated)
  * Does NOT block requests - just provides data
@@ -29,7 +57,21 @@ export async function sessionMiddleware(
   next: Next
 ) {
   const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  // Filter duplicate cookies to prevent conflicts from old domain cookies
+  // TEMPORARY: Can be removed after 2025-12-18
+  const originalCookies = c.req.header('Cookie');
+  const filteredCookies = filterDuplicateCookies(originalCookies);
+
+  let headers: Headers;
+  if (filteredCookies && filteredCookies !== originalCookies) {
+    headers = new Headers(c.req.raw.headers);
+    headers.set('Cookie', filteredCookies);
+  } else {
+    headers = c.req.raw.headers;
+  }
+
+  const session = await auth.api.getSession({ headers });
 
   if (!session?.user) {
     c.set('user', null);

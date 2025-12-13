@@ -178,9 +178,9 @@ comments.post('/post/:postId', requireVerifiedEmail(), async (c) => {
     const now = new Date();
     const commentId = generateId();
 
-    // Use transaction for atomicity
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.comments).values({
+    // Use batch for atomicity (D1 doesn't support transactions)
+    await db.batch([
+      db.insert(schema.comments).values({
         id: commentId,
         postId,
         authorId: user.id,
@@ -190,22 +190,20 @@ comments.post('/post/:postId', requireVerifiedEmail(), async (c) => {
         isDeleted: false,
         createdAt: now,
         updatedAt: now,
-      });
-
+      }),
       // Auto-like own comment (like posts)
-      await tx.insert(schema.commentUpvotes).values({
+      db.insert(schema.commentUpvotes).values({
         id: generateId(),
         commentId,
         userId: user.id,
         createdAt: now,
-      });
-
+      }),
       // Update karma for auto-upvote (consistent with posts)
-      await tx
+      db
         .update(schema.users)
         .set({ karma: sql`${schema.users.karma} + 1` })
-        .where(eq(schema.users.id, user.id));
-    });
+        .where(eq(schema.users.id, user.id)),
+    ]);
 
     const created = await db
       .select({
