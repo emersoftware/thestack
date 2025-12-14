@@ -21,7 +21,7 @@
   aria-pressed={active}
   aria-label="Upvote"
   data-nav-upvote
-  class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {active ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {loading ? 'animate-pulse' : ''}"
+  class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} {loading ? 'animate-pulse' : ''}"
 >
   <svg
     class="w-4 h-4 {loading ? 'opacity-50' : ''}"
@@ -32,5 +32,5 @@
   >
     <path d="M12 6 L19 18 L5 18 Z" />
   </svg>
-  <span class="text-xs font-semibold {active ? 'text-the-black' : 'text-neutral-600'} {loading ? 'opacity-50' : ''}">{count}</span>
+  <span class="text-xs font-semibold {active ? 'text-foreground' : 'text-muted-foreground'} {loading ? 'opacity-50' : ''}">{count}</span>
 </button>

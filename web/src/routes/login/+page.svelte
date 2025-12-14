@@ -40,11 +40,11 @@
   <title>Login - the stack</title>
 </svelte:head>
 
-<div class="flex-1 flex items-center justify-center bg-the-white py-4 sm:py-0">
+<div class="flex-1 flex items-center justify-center bg-background py-4 sm:py-0">
   <div class="max-w-md w-full space-y-6 sm:space-y-8 px-4">
     <div>
-      <h2 class="text-center text-2xl sm:text-3xl text-neutral-900">
-        Ingresa a <span class="font-extrabold text-the-black">the stack</span>
+      <h2 class="text-center text-2xl sm:text-3xl text-foreground">
+        Ingresa a <span class="font-extrabold text-foreground">the stack</span>
       </h2>
     </div>
 
@@ -52,7 +52,7 @@
       <button
         onclick={handleGitHubLogin}
         disabled={loading}
-        class="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2 border border-neutral-300 rounded-lg bg-the-white text-neutral-700 hover:border-the-black hover:text-the-black transition-colors disabled:opacity-50"
+        class="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2 border border-input rounded-lg bg-card text-foreground hover:border-border-hover hover:text-foreground transition-colors disabled:opacity-50"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -64,22 +64,22 @@
 
       <div class="relative">
         <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-neutral-300"></div>
+          <div class="w-full border-t border-input"></div>
         </div>
         <div class="relative flex justify-center text-sm">
-          <span class="px-2 bg-the-white text-neutral-500">o</span>
+          <span class="px-2 bg-background text-muted-foreground">o</span>
         </div>
       </div>
 
       {#if error}
-        <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div class="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error">
           {error}
         </div>
       {/if}
 
       <form onsubmit={handleSubmit} class="space-y-4">
         <div>
-          <label for="email" class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="email" class="block text-sm font-medium text-foreground mb-1">
             Email
           </label>
           <input
@@ -87,13 +87,13 @@
             id="email"
             bind:value={email}
             required
-            class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-the-black"
+            class="w-full px-3 py-2 border border-input rounded-lg bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="tu@email.com"
           />
         </div>
 
         <div>
-          <label for="password" class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="password" class="block text-sm font-medium text-foreground mb-1">
             Contraseña
           </label>
           <input
@@ -102,7 +102,7 @@
             bind:value={password}
             required
             minlength={8}
-            class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-the-black"
+            class="w-full px-3 py-2 border border-input rounded-lg bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="********"
           />
         </div>
@@ -110,14 +110,14 @@
         <button
           type="submit"
           disabled={loading}
-          class="hover:cursor-pointer w-full hover:bg-the-white hover:text-the-black hover:ring-the-black hover:ring-1 text-white py-2 px-4 rounded-lg bg-the-black transition-colors disabled:bg-neutral-400"
+          class="hover:cursor-pointer w-full hover:opacity-80 text-accent-foreground py-2 px-4 rounded-lg bg-accent transition-colors disabled:opacity-40"
         >
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
 
       <div class="text-center">
-        <a href="/register" class="text-sm text-neutral-500 hover:text-neutral-700">
+        <a href="/register" class="text-sm text-muted-foreground hover:text-foreground">
           ¿no tienes cuenta? únete aquí
         </a>
       </div>

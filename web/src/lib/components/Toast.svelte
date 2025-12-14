@@ -8,9 +8,9 @@
     <div
       transition:fly={{ y: 20, duration: 200 }}
       class="px-4 py-3 rounded-lg shadow-lg text-sm font-medium
-        {t.type === 'success' ? 'bg-the-green text-white' : ''}
-        {t.type === 'error' ? 'bg-the-red text-white' : ''}
-        {t.type === 'info' ? 'bg-the-black text-white' : ''}"
+        {t.type === 'success' ? 'bg-success text-white' : ''}
+        {t.type === 'error' ? 'bg-error text-white' : ''}
+        {t.type === 'info' ? 'bg-accent text-accent-foreground' : ''}"
     >
       {t.message}
     </div>

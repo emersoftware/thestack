@@ -92,15 +92,15 @@
 <div class="flex-1 flex items-center justify-center py-4 sm:py-0">
   <div class="max-w-md w-full space-y-6 sm:space-y-8 px-4">
     <div>
-      <h2 class="text-center text-2xl sm:text-3xl text-neutral-900">
-        Publicar en <span class="font-extrabold text-the-black">the stack</span>
+      <h2 class="text-center text-2xl sm:text-3xl text-foreground">
+        Publicar en <span class="font-extrabold text-foreground">the stack</span>
       </h2>
     </div>
 
     <div class="space-y-4">
       <form onsubmit={handleSubmit} class="space-y-3">
         <div>
-          <label for="title" class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="title" class="block text-sm font-medium text-foreground mb-1">
             Título
           </label>
           <input
@@ -110,13 +110,13 @@
             required
             maxlength={300}
             disabled={loading}
-            class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-the-black disabled:bg-neutral-100"
+            class="w-full px-3 py-2 border border-input rounded-lg bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
             placeholder="Ingresa el título del artículo"
           />
         </div>
 
         <div>
-          <label for="url" class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="url" class="block text-sm font-medium text-foreground mb-1">
             URL
           </label>
           <input
@@ -125,7 +125,7 @@
             bind:value={url}
             required
             disabled={loading}
-            class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-the-black disabled:bg-neutral-100"
+            class="w-full px-3 py-2 border border-input rounded-lg bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
             placeholder="https://ejemplo.com/articulo"
           />
         </div>
@@ -133,7 +133,7 @@
         <button
           type="submit"
           disabled={loading}
-          class="hover:cursor-pointer w-full hover:bg-the-white hover:text-the-black hover:ring-the-black hover:ring-1 text-white py-2 px-4 rounded-lg bg-the-black transition-colors disabled:bg-neutral-400 flex items-center justify-center gap-2"
+          class="hover:cursor-pointer w-full hover:opacity-80 text-accent-foreground py-2 px-4 rounded-lg bg-accent transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {#if loading}
             <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -144,7 +144,7 @@
         </button>
 
         <div class="text-center">
-          <a href="/" class="text-sm text-neutral-500 hover:text-neutral-700">
+          <a href="/" class="text-sm text-muted-foreground hover:text-foreground">
             volver
           </a>
         </div>
@@ -152,9 +152,9 @@
 
       <div class="space-y-2">
         <div class="flex items-center gap-2">
-          <p class="text-sm text-neutral-500">Vista previa</p>
+          <p class="text-sm text-muted-foreground">Vista previa</p>
           <svg
-            class="w-4 h-4 text-neutral-500"
+            class="w-4 h-4 text-muted-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

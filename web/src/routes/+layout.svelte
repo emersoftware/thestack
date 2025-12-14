@@ -29,7 +29,7 @@
   });
 </script>
 
-<div class="min-h-screen p-2 sm:p-3 bg-the-white flex flex-col">
+<div class="min-h-screen p-2 sm:p-3 bg-background flex flex-col">
   <Header user={data.user} />
   {@render children()}
 </div>

@@ -88,23 +88,23 @@
 <div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
   {#if error}
     <div
-      class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+      class="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error"
     >
       {error}
     </div>
   {:else if profile}
-    <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-4 mb-4">
+    <div class="bg-card border border-border rounded-xl p-4 sm:p-4 mb-4">
       <div class="flex sm:flex-row justify-between sm:items-start gap-2 sm:gap-0">
         <div>
-          <h1 class="text-lg text-the-black">{profile.username}</h1>
-          <p class="text-xs sm:text-sm text-neutral-500 mt-1">
+          <h1 class="text-lg text-foreground">{profile.username}</h1>
+          <p class="text-xs sm:text-sm text-muted-foreground mt-1">
             {profile.karma} karma · miembro desde {formatDate(profile.createdAt)}
           </p>
         </div>
         {#if isOwnProfile && !editing}
           <button
             onclick={startEdit}
-            class="text-sm text-neutral-500 hover:text-the-black self-start"
+            class="text-sm text-muted-foreground hover:text-foreground self-start"
           >
             editar
           </button>
@@ -115,7 +115,7 @@
         <div class="mt-4">
           <textarea
             bind:value={editAbout}
-            class="w-full border border-neutral-300 rounded-lg p-3 text-sm resize-none focus:outline-none focus:border-the-black"
+            class="w-full border border-input rounded-lg p-3 text-sm bg-card text-foreground resize-none focus:outline-none focus:border-accent"
             rows="3"
             placeholder="Cuéntanos sobre ti..."
             maxlength="500"
@@ -124,26 +124,26 @@
             <button
               onclick={saveAbout}
               disabled={saving}
-              class="px-3 py-1 text-sm bg-the-black text-white rounded-lg hover:bg-neutral-800 disabled:opacity-50"
+              class="px-3 py-1 text-sm bg-accent text-accent-foreground rounded-lg hover:opacity-80 disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button
               onclick={() => (editing = false)}
-              class="px-3 py-1 text-sm text-neutral-500 hover:text-the-black"
+              class="px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
             >
               Cancelar
             </button>
           </div>
         </div>
       {:else if profile.about}
-        <p class="mt-4 text-sm text-neutral-700">{profile.about}</p>
+        <p class="mt-4 text-sm text-foreground">{profile.about}</p>
       {/if}
     </div>
 
-    <h2 class="text-base sm:text-lg font-medium text-the-black mb-3 sm:mb-4">Posts</h2>
+    <h2 class="text-base sm:text-lg font-medium text-foreground mb-3 sm:mb-4">Posts</h2>
     {#if posts.length === 0}
-      <p class="text-neutral-500 text-center py-8">Sin posts todavía</p>
+      <p class="text-muted-foreground text-center py-8">Sin posts todavía</p>
     {:else}
       <div class="grid gap-2 sm:gap-3 justify-items-stretch sm:justify-items-start">
         {#each posts as post (post.id)}

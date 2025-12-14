@@ -87,18 +87,18 @@
   }
 </script>
 
-<article class="bg-the-white border border-neutral-200 rounded-xl p-4">
+<article class="bg-card border border-border rounded-xl p-4">
   <div class="flex justify-between items-start gap-2">
     <div>
       <a
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
-        class="text-lg text-the-black hover:underline"
+        class="text-lg text-foreground hover:underline"
       >
         {post.title}
       </a>
-      <div class="flex items-center gap-2 text-xs text-neutral-500 mt-4">
+      <div class="flex items-center gap-2 text-xs text-muted-foreground mt-4">
         <UpvoteButton
           count={optimisticCount}
           active={optimisticUpvoted}
@@ -108,14 +108,14 @@
         <span>·</span>
         <span>{getRelativeTime(post.createdAt)}</span>
         <span>·</span>
-        <a href="/user/{post.author.username}" class="hover:text-the-black">
+        <a href="/user/{post.author.username}" class="hover:text-foreground">
           {post.author.username}
         </a>
       </div>
     </div>
     <a
       href="/site/{post.domain}"
-      class="text-xs shrink-0 border-neutral-300 border text-neutral-500 hover:border-the-black hover:text-the-black transition-colors duration-200 px-2 py-1 rounded-full max-w-[120px] truncate"
+      class="text-xs shrink-0 border-input border text-muted-foreground hover:border-border-hover hover:text-foreground transition-colors duration-200 px-2 py-1 rounded-full max-w-[120px] truncate"
     >
       {post.domain}
     </a>

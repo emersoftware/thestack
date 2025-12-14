@@ -165,10 +165,10 @@
     onclick={() => showHelp = false}
     role="dialog"
   >
-    <div class="bg-the-white rounded-xl border border-neutral-200 shadow-xl max-w-sm w-full" onclick={e => e.stopPropagation()}>
-      <div class="p-4 border-b border-neutral-200 flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-the-black">Atajos</h2>
-        <button onclick={() => showHelp = false} class="text-neutral-400 hover:text-the-black">
+    <div class="bg-card rounded-xl border border-border shadow-xl max-w-sm w-full" onclick={e => e.stopPropagation()}>
+      <div class="p-4 border-b border-border flex justify-between items-center">
+        <h2 class="text-lg font-semibold text-foreground">Atajos</h2>
+        <button onclick={() => showHelp = false} class="text-muted-foreground hover:text-foreground">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
@@ -176,32 +176,32 @@
       </div>
       <div class="p-4 space-y-3 text-sm">
         <!-- Vim mode toggle -->
-        <div class="flex items-center justify-between pb-3 border-b border-neutral-200">
-          <span class="text-neutral-600">Modo vim</span>
+        <div class="flex items-center justify-between pb-3 border-b border-border">
+          <span class="text-muted-foreground">Modo vim</span>
           <button
             onclick={toggleVimMode}
-            class="relative w-10 h-5 rounded-full transition-colors {vimMode ? 'bg-the-black' : 'bg-neutral-300'}"
+            class="relative w-10 h-5 rounded-full transition-colors {vimMode ? 'bg-accent' : 'bg-muted'}"
           >
-            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform {vimMode ? 'translate-x-5' : ''}"></span>
+            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-card rounded-full transition-transform {vimMode ? 'translate-x-5' : ''}"></span>
           </button>
         </div>
 
         {#if vimMode}
           <div class="space-y-2">
-            <div class="flex justify-between"><span class="text-neutral-600">Siguiente</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">j</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Anterior</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">k</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Inicio</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">g</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Final</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">G</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Abrir link</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">o</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Comentarios</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">c</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Upvote</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">u</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Responder</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">r</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Volver</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">p</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Home</span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">h</kbd></div>
-            <div class="flex justify-between"><span class="text-neutral-600">Enviar</span><span><kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">Ctrl</kbd> <kbd class="px-1.5 py-0.5 bg-neutral-100 rounded text-xs font-mono">↵</kbd></span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Siguiente</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">j</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Anterior</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">k</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Inicio</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">g</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Final</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">G</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Abrir link</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">o</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Comentarios</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">c</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Upvote</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">u</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Responder</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">r</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Volver</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">p</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Home</span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">h</kbd></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Enviar</span><span><kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Ctrl</kbd> <kbd class="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">↵</kbd></span></div>
           </div>
         {:else}
-          <div class="text-center py-4 text-neutral-400 text-xs">
+          <div class="text-center py-4 text-muted-foreground text-xs">
             Activa el modo vim para usar atajos de teclado
           </div>
         {/if}
@@ -213,6 +213,6 @@
 <style>
   :global([data-nav-focus="true"]) {
     outline: none !important;
-    box-shadow: 0 0 0 2px var(--color-the-black) !important;
+    box-shadow: 0 0 0 2px var(--color-accent) !important;
   }
 </style>

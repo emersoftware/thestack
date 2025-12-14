@@ -109,29 +109,27 @@
     width="40"
     height="40"
     rx="6"
-    stroke="white"
-    stroke-width="1"
-    class="fill-the-black"
+    class="fill-accent"
   />
 
   <g clip-path="url(#logo-mask)">
     <g style="transform: translateY({$y}px)">
-      <rect x="2" y="2" width="15" height="10" rx="4" class="fill-the-white" />
-      <rect x="2" y="14" width="20" height="20" rx="4" class="fill-the-white" />
-      <rect x="2" y="36" width="30" height="30" rx="4" class="fill-the-white" />
-      <rect x="2" y="68" width="20" height="30" rx="4" class="fill-the-white" />
-      <rect x="7" y="100" width="15" height="13" rx="4" class="fill-the-white" />
-      <rect x="7" y="115" width="15" height="7" rx="3.5" class="fill-the-white" />
-      <rect x="7" y="124" width="15" height="7" rx="3.5" class="fill-the-white" />
-      <rect x="7" y="133" width="15" height="7" rx="3.5" class="fill-the-white" />
-      <rect x="2" y="142" width="20" height="13" rx="4" class="fill-the-white" />
-      <rect x="2" y="157" width="20" height="6" rx="3" class="fill-the-white" />
-      <rect x="2" y="165" width="20" height="6" rx="3" class="fill-the-white" />
-      <rect x="2" y="173" width="20" height="9" rx="4" class="fill-the-white" />
-      <rect x="2" y="184" width="20" height="6" rx="3" class="fill-the-white" />
-      <rect x="2" y="192" width="20" height="30" rx="4" class="fill-the-white" />
-      <rect x="2" y="224" width="20" height="30" rx="4" class="fill-the-white" />
-      <rect x="7" y="256" width="31" height="31" rx="4" class="fill-the-white" />
+      <rect x="2" y="2" width="15" height="10" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="14" width="20" height="20" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="36" width="30" height="30" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="68" width="20" height="30" rx="4" class="fill-accent-foreground" />
+      <rect x="7" y="100" width="15" height="13" rx="4" class="fill-accent-foreground" />
+      <rect x="7" y="115" width="15" height="7" rx="3.5" class="fill-accent-foreground" />
+      <rect x="7" y="124" width="15" height="7" rx="3.5" class="fill-accent-foreground" />
+      <rect x="7" y="133" width="15" height="7" rx="3.5" class="fill-accent-foreground" />
+      <rect x="2" y="142" width="20" height="13" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="157" width="20" height="6" rx="3" class="fill-accent-foreground" />
+      <rect x="2" y="165" width="20" height="6" rx="3" class="fill-accent-foreground" />
+      <rect x="2" y="173" width="20" height="9" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="184" width="20" height="6" rx="3" class="fill-accent-foreground" />
+      <rect x="2" y="192" width="20" height="30" rx="4" class="fill-accent-foreground" />
+      <rect x="2" y="224" width="20" height="30" rx="4" class="fill-accent-foreground" />
+      <rect x="7" y="256" width="31" height="31" rx="4" class="fill-accent-foreground" />
     </g>
   </g>
 </svg>

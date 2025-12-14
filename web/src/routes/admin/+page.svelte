@@ -89,17 +89,17 @@
 </svelte:head>
 
 <div class="mt-4 sm:mt-8 w-full max-w-4xl mx-auto px-3 sm:px-4">
-  <h1 class="text-xl sm:text-2xl font-bold text-the-black mb-4 sm:mb-6">Admin Panel</h1>
+  <h1 class="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">Admin Panel</h1>
 
   <!-- Tabs -->
-  <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-neutral-200 overflow-x-auto">
+  <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border overflow-x-auto">
     {#each ['stats', 'users', 'posts'] as tab}
       <button
         onclick={() => (activeTab = tab as 'stats' | 'users' | 'posts')}
         class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
           {activeTab === tab
-          ? 'text-the-black border-b-2 border-the-black'
-          : 'text-neutral-500 hover:text-the-black'}"
+          ? 'text-foreground border-b-2 border-accent'
+          : 'text-muted-foreground hover:text-foreground'}"
       >
         {tab === 'stats' ? 'Estadisticas' : tab === 'users' ? 'Usuarios' : 'Posts'}
       </button>
@@ -107,76 +107,76 @@
   </div>
 
   {#if loading}
-    <p class="text-neutral-500 text-center py-8">Cargando...</p>
+    <p class="text-muted-foreground text-center py-8">Cargando...</p>
   {:else if error}
-    <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <div class="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error">
       {error}
     </div>
   {:else}
     <!-- Stats Tab -->
     {#if activeTab === 'stats' && stats}
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.users}</p>
-          <p class="text-xs sm:text-sm text-neutral-500">Usuarios</p>
+        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.users}</p>
+          <p class="text-xs sm:text-sm text-muted-foreground">Usuarios</p>
         </div>
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.posts}</p>
-          <p class="text-xs sm:text-sm text-neutral-500">Posts</p>
+        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.posts}</p>
+          <p class="text-xs sm:text-sm text-muted-foreground">Posts</p>
         </div>
-        <div class="bg-the-white border border-neutral-200 rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-the-black">{stats.upvotes}</p>
-          <p class="text-xs sm:text-sm text-neutral-500">Upvotes</p>
+        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
+          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.upvotes}</p>
+          <p class="text-xs sm:text-sm text-muted-foreground">Upvotes</p>
         </div>
       </div>
     {/if}
 
     <!-- Users Tab -->
     {#if activeTab === 'users'}
-      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-x-auto">
+      <div class="bg-card border border-border rounded-xl overflow-x-auto">
         <table class="w-full text-xs sm:text-sm min-w-[500px]">
-          <thead class="bg-the-white border-b border-neutral-200">
+          <thead class="bg-card border-b border-border">
             <tr>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Usuario</th>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Karma</th>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Estado</th>
-              <th class="text-right px-4 py-3 font-medium text-neutral-700">Acciones</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Usuario</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Karma</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Estado</th>
+              <th class="text-right px-4 py-3 font-medium text-foreground">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {#each users as u (u.id)}
-              <tr class="border-b border-neutral-100 last:border-0">
+              <tr class="border-b border-border last:border-0">
                 <td class="px-4 py-3">
-                  <span class="font-medium">{u.username}</span>
-                  <span class="text-neutral-500 text-xs ml-2">{u.email}</span>
+                  <span class="font-medium text-foreground">{u.username}</span>
+                  <span class="text-muted-foreground text-xs ml-2">{u.email}</span>
                 </td>
-                <td class="px-4 py-3">{u.karma}</td>
+                <td class="px-4 py-3 text-foreground">{u.karma}</td>
                 <td class="px-4 py-3">
                   {#if u.isBanned}
-                    <span class="text-the-red">Baneado</span>
+                    <span class="text-error">Baneado</span>
                   {:else if u.isAdmin}
-                    <span class="text-the-blue">Admin</span>
+                    <span class="text-info">Admin</span>
                   {:else}
-                    <span class="text-neutral-500">Usuario</span>
+                    <span class="text-muted-foreground">Usuario</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3 text-right space-x-2">
                   {#if u.id !== user?.id}
                     {#if u.isAdmin}
-                      <button onclick={() => handleDemote(u.id)} class="text-xs text-the-orange hover:underline">
+                      <button onclick={() => handleDemote(u.id)} class="text-xs text-warning hover:underline">
                         Quitar admin
                       </button>
                     {:else}
-                      <button onclick={() => handlePromote(u.id)} class="text-xs text-the-blue hover:underline">
+                      <button onclick={() => handlePromote(u.id)} class="text-xs text-info hover:underline">
                         Hacer admin
                       </button>
                     {/if}
                     {#if u.isBanned}
-                      <button onclick={() => handleUnban(u.id)} class="text-xs text-the-green hover:underline">
+                      <button onclick={() => handleUnban(u.id)} class="text-xs text-success hover:underline">
                         Desbanear
                       </button>
                     {:else}
-                      <button onclick={() => handleBan(u.id)} class="text-xs text-the-red hover:underline">
+                      <button onclick={() => handleBan(u.id)} class="text-xs text-error hover:underline">
                         Banear
                       </button>
                     {/if}
@@ -191,37 +191,37 @@
 
     <!-- Posts Tab -->
     {#if activeTab === 'posts'}
-      <div class="bg-the-white border border-neutral-200 rounded-xl overflow-x-auto">
+      <div class="bg-card border border-border rounded-xl overflow-x-auto">
         <table class="w-full text-xs sm:text-sm min-w-[500px]">
-          <thead class="bg-the-white border-b border-neutral-200">
+          <thead class="bg-card border-b border-border">
             <tr>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Titulo</th>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Autor</th>
-              <th class="text-left px-4 py-3 font-medium text-neutral-700">Estado</th>
-              <th class="text-right px-4 py-3 font-medium text-neutral-700">Accion</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Titulo</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Autor</th>
+              <th class="text-left px-4 py-3 font-medium text-foreground">Estado</th>
+              <th class="text-right px-4 py-3 font-medium text-foreground">Accion</th>
             </tr>
           </thead>
           <tbody>
             {#each posts as p (p.id)}
-              <tr class="border-b border-neutral-100 last:border-0 {p.isDeleted ? 'opacity-50' : ''}">
+              <tr class="border-b border-border last:border-0 {p.isDeleted ? 'opacity-50' : ''}">
                 <td class="px-4 py-3">
-                  <a href={p.url} target="_blank" class="hover:underline">{p.title}</a>
+                  <a href={p.url} target="_blank" class="text-foreground hover:underline">{p.title}</a>
                 </td>
-                <td class="px-4 py-3">{p.author.username}</td>
+                <td class="px-4 py-3 text-foreground">{p.author.username}</td>
                 <td class="px-4 py-3">
                   {#if p.isDeleted}
-                    <span class="text-the-red">Eliminado</span>
+                    <span class="text-error">Eliminado</span>
                   {:else}
-                    <span class="text-the-green">Activo</span>
+                    <span class="text-success">Activo</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3 text-right">
                   {#if p.isDeleted}
-                    <button onclick={() => handleRestore(p.id)} class="text-xs text-the-green hover:underline">
+                    <button onclick={() => handleRestore(p.id)} class="text-xs text-success hover:underline">
                       Restaurar
                     </button>
                   {:else}
-                    <button onclick={() => handleDelete(p.id)} class="text-xs text-the-red hover:underline">
+                    <button onclick={() => handleDelete(p.id)} class="text-xs text-error hover:underline">
                       Eliminar
                     </button>
                   {/if}

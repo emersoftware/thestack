@@ -64,13 +64,13 @@
 </script>
 
 {#if error}
-  <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+  <div class="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error">
     {error}
   </div>
 {:else if posts.length === 0}
   <div class="text-center py-16">
-    <p class="text-neutral-500 mb-4">No hay posts todavía</p>
-    <a href="/submit" class="text-the-black hover:underline font-medium">
+    <p class="text-muted-foreground mb-4">No hay posts todavía</p>
+    <a href="/submit" class="text-foreground hover:underline font-medium">
       Sé el primero en publicar
     </a>
   </div>

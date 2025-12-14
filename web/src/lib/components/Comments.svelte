@@ -232,17 +232,17 @@
 <div class="mt-4">
   <!-- Header -->
   <div class="flex items-center gap-3 mb-4">
-    <span class="text-sm font-semibold text-the-black">
+    <span class="text-sm font-semibold text-foreground">
       {comments.length} {comments.length === 1 ? 'comentario' : 'comentarios'}
     </span>
-    <div class="flex-1 h-px bg-neutral-200"></div>
+    <div class="flex-1 h-px bg-border"></div>
   </div>
 
   <!-- New comment form -->
   <form onsubmit={handleSubmit} class="mb-4">
-    <div class="bg-the-white rounded-xl border border-neutral-200 focus-within:border-the-black transition-colors p-3 sm:p-4" data-nav-item>
+    <div class="bg-card rounded-xl border border-border focus-within:border-border-hover transition-colors p-3 sm:p-4" data-nav-item>
       <div class="flex items-center gap-2 mb-2">
-        <span class="text-xs font-semibold text-the-black">{user?.username || 'Tú'}</span>
+        <span class="text-xs font-semibold text-foreground">{user?.username || 'Tú'}</span>
       </div>
       <textarea
         bind:value={newComment}
@@ -250,14 +250,14 @@
         disabled={!user || submitting}
         rows="1"
         data-nav-textarea
-        class="w-full text-sm bg-transparent focus:outline-none resize-none disabled:cursor-not-allowed placeholder:text-neutral-400 leading-relaxed"
+        class="w-full text-sm bg-transparent text-foreground focus:outline-none resize-none disabled:cursor-not-allowed placeholder:text-muted-foreground leading-relaxed"
       ></textarea>
       <div class="flex justify-end mt-2">
         <button
           type="submit"
           data-nav-submit
           disabled={!user || !newComment.trim() || submitting}
-          class="px-4 py-1.5 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
+          class="px-4 py-1.5 text-xs font-medium text-accent-foreground bg-accent rounded-full hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Enviando...' : 'Comentar'}
         </button>
@@ -268,8 +268,8 @@
   <!-- Comments list -->
   {#if comments.length === 0}
     <div class="text-center py-12">
-      <p class="text-neutral-400 text-sm">Sin comentarios aún</p>
-      <p class="text-neutral-400 text-xs mt-1">Sé el primero en comentar</p>
+      <p class="text-muted-foreground text-sm">Sin comentarios aún</p>
+      <p class="text-muted-foreground text-xs mt-1">Sé el primero en comentar</p>
     </div>
   {:else}
     <div class="space-y-2">
@@ -283,7 +283,7 @@
 {#snippet commentNode(comment: Comment, depth: number)}
   <div class="relative {depth > 0 ? 'ml-4 sm:ml-8' : ''}">
     <div
-      class="bg-the-white rounded-xl border border-neutral-200 hover:border-neutral-300 transition-colors p-3 sm:p-4"
+      class="bg-card rounded-xl border border-border hover:border-border-hover transition-colors p-3 sm:p-4"
       data-nav-item
       data-nav-id={comment.id}
       data-nav-parent={comment.parentId || ''}
@@ -293,16 +293,16 @@
       <div class="flex items-center gap-2 mb-2">
         <a
           href="/user/{comment.author.username}"
-          class="text-xs font-semibold text-the-black hover:underline {comment.isDeleted ? 'pointer-events-none' : ''}"
+          class="text-xs font-semibold text-foreground hover:underline {comment.isDeleted ? 'pointer-events-none' : ''}"
         >
           {comment.author.username}
         </a>
-        <span class="text-xs text-neutral-400">·</span>
-        <span class="text-xs text-neutral-400">{getRelativeTime(comment.createdAt)}</span>
+        <span class="text-xs text-muted-foreground">·</span>
+        <span class="text-xs text-muted-foreground">{getRelativeTime(comment.createdAt)}</span>
       </div>
 
       <!-- Comment content -->
-      <p class="text-sm text-the-black whitespace-pre-wrap break-words leading-relaxed {comment.isDeleted ? 'italic text-neutral-400' : ''}">
+      <p class="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed {comment.isDeleted ? 'italic text-muted-foreground' : ''}">
         {comment.content}
       </p>
 
@@ -315,7 +315,7 @@
             onclick={() => handleUpvote(comment.id)}
             disabled={upvotingComment === comment.id}
             data-nav-upvote
-            class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasUpvoted ? 'text-the-black' : 'text-neutral-400 hover:text-the-black'} {upvotingComment === comment.id ? 'animate-pulse' : ''}"
+            class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasUpvoted ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} {upvotingComment === comment.id ? 'animate-pulse' : ''}"
           >
             <svg
               class="w-3 h-3 {upvotingComment === comment.id ? 'opacity-50' : ''}"
@@ -326,13 +326,13 @@
             >
               <path d="M12 6 L19 18 L5 18 Z" />
             </svg>
-            <span class="text-xs font-semibold {comment.hasUpvoted ? 'text-the-black' : 'text-neutral-500'} {upvotingComment === comment.id ? 'opacity-50' : ''}">{comment.upvotesCount}</span>
+            <span class="text-xs font-semibold {comment.hasUpvoted ? 'text-foreground' : 'text-muted-foreground'} {upvotingComment === comment.id ? 'opacity-50' : ''}">{comment.upvotesCount}</span>
           </button>
           <button
             type="button"
             onclick={() => { replyingTo = replyingTo === comment.id ? null : comment.id; replyContent = ''; }}
             data-nav-reply
-            class="text-xs text-neutral-500 hover:text-the-black transition-colors flex items-center gap-1"
+            class="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 10h10a5 5 0 0 1 5 5v6M3 10l6-6M3 10l6 6"/>
@@ -343,7 +343,7 @@
             <button
               type="button"
               onclick={() => handleDelete(comment.id)}
-              class="text-xs text-neutral-400 hover:text-the-red transition-colors"
+              class="text-xs text-muted-foreground hover:text-error transition-colors"
             >
               eliminar
             </button>
@@ -359,11 +359,11 @@
         class="mt-2 ml-4 sm:ml-8"
         use:scrollIntoView
       >
-        <div class="bg-the-white rounded-xl border border-the-black p-3 sm:p-4">
+        <div class="bg-card rounded-xl border border-border-hover p-3 sm:p-4">
           <div class="flex items-center gap-2 mb-2">
-            <span class="text-xs font-semibold text-the-black">{user?.username || 'Tú'}</span>
-            <span class="text-xs text-neutral-400">·</span>
-            <span class="text-xs text-neutral-400">borrador</span>
+            <span class="text-xs font-semibold text-foreground">{user?.username || 'Tú'}</span>
+            <span class="text-xs text-muted-foreground">·</span>
+            <span class="text-xs text-muted-foreground">borrador</span>
           </div>
           <textarea
             bind:value={replyContent}
@@ -371,13 +371,13 @@
             rows="1"
             data-nav-textarea
             data-nav-submit-id={comment.id}
-            class="w-full text-sm bg-transparent focus:outline-none resize-none placeholder:text-neutral-400 leading-relaxed"
+            class="w-full text-sm bg-transparent text-foreground focus:outline-none resize-none placeholder:text-muted-foreground leading-relaxed"
           ></textarea>
           <div class="flex gap-2 justify-end mt-1">
             <button
               type="button"
               onclick={() => { replyingTo = null; replyContent = ''; }}
-              class="px-3 py-1 text-xs text-neutral-500 hover:text-the-black transition-colors"
+              class="px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancelar
             </button>
@@ -386,7 +386,7 @@
               onclick={() => handleReply(comment.id)}
               disabled={!replyContent.trim() || submitting}
               data-nav-submit={comment.id}
-              class="px-3 py-1 text-xs font-medium text-the-white bg-the-black rounded-full hover:bg-neutral-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors"
+              class="px-3 py-1 text-xs font-medium text-accent-foreground bg-accent rounded-full hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {submitting ? '...' : 'Responder'}
             </button>
@@ -412,14 +412,14 @@
     onclick={() => deletingCommentId = null}
     role="dialog"
   >
-    <div class="bg-the-white rounded-xl shadow-xl max-w-sm w-full p-4" onclick={e => e.stopPropagation()}>
-      <h2 class="text-lg font-semibold text-the-black mb-2">Eliminar comentario</h2>
-      <p class="text-sm text-neutral-600 mb-4">Seguro? Esta acción no se puede deshacer.</p>
+    <div class="bg-card rounded-xl shadow-xl max-w-sm w-full p-4" onclick={e => e.stopPropagation()}>
+      <h2 class="text-lg font-semibold text-foreground mb-2">Eliminar comentario</h2>
+      <p class="text-sm text-muted-foreground mb-4">Seguro? Esta acción no se puede deshacer.</p>
       <div class="flex justify-end gap-2">
-        <button onclick={() => deletingCommentId = null} class="px-4 py-2 text-sm text-neutral-600 hover:text-the-black">
+        <button onclick={() => deletingCommentId = null} class="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
           Cancelar
         </button>
-        <button onclick={confirmDelete} class="px-4 py-2 text-sm font-medium text-the-red border border-the-red rounded-full hover:bg-the-red hover:text-the-white transition-colors">
+        <button onclick={confirmDelete} class="px-4 py-2 text-sm font-medium text-error border border-error rounded-full hover:bg-error hover:text-white transition-colors">
           Eliminar
         </button>
       </div>

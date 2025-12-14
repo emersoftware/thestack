@@ -6,6 +6,23 @@
     <link rel="icon" href="%sveltekit.assets%/icon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="the stack - latam hacker news" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Theme initialization script - prevents flash of wrong theme -->
+    <script>
+      (function() {
+        const STORAGE_KEY = 'thestack-theme';
+        let theme;
+        try { theme = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark' && theme !== 'system') theme = 'system';
+        let resolved = theme;
+        if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        if (resolved === 'dark') document.documentElement.classList.add('dark');
+        document.documentElement.style.colorScheme = resolved;
+      })();
+    </script>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
