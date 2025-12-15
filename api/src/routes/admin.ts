@@ -4,6 +4,7 @@ import { eq, sql, desc } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
+import { sendWeeklyNewsletter } from '../lib/newsletter';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -317,6 +318,22 @@ admin.put('/users/:id/remove-super-admin', requireSuperAdmin(), async (c) => {
   } catch (error) {
     console.error('Error removing super admin:', error);
     return c.json({ error: 'Error al quitar super admin' }, 500);
+  }
+});
+
+// Manually trigger the weekly newsletter (admin only)
+admin.post('/newsletter/send', async (c) => {
+  try {
+    console.log('[Admin] Manual newsletter trigger requested');
+    const result = await sendWeeklyNewsletter(c.env);
+    return c.json({
+      success: true,
+      sent: result.sent,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('Error sending newsletter:', error);
+    return c.json({ error: 'Error al enviar newsletter' }, 500);
   }
 });
 

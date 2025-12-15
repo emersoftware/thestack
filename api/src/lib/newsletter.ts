@@ -32,7 +32,8 @@ const NEWSLETTER_SUBJECTS = [
  */
 export function getWeeklySubject(): string {
   const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-  return NEWSLETTER_SUBJECTS[weekNum % NEWSLETTER_SUBJECTS.length];
+  const quote = NEWSLETTER_SUBJECTS[weekNum % NEWSLETTER_SUBJECTS.length];
+  return `${quote} - La ultima semana en the stack`;
 }
 
 /**
@@ -284,7 +285,7 @@ export async function sendWeeklyNewsletter(
 
       try {
         const batchEmails = chunk.map((subscriber) => ({
-          from: 'the stack <noreply@thestack.cl>',
+          from: 'the stack <hola@thestack.cl>',
           to: [subscriber.email],
           subject,
           html: emailHtml,

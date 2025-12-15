@@ -62,3 +62,13 @@ export async function deletePost(id: string): Promise<{ success: boolean }> {
 export async function restorePost(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/admin/posts/${id}/restore`, { method: 'PUT' });
 }
+
+export interface NewsletterResult {
+  success: boolean;
+  sent: number;
+  errors: number;
+}
+
+export async function sendNewsletter(): Promise<NewsletterResult> {
+  return apiFetch('/api/admin/newsletter/send', { method: 'POST' });
+}

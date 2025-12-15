@@ -11,6 +11,7 @@
     unbanUser,
     deletePost,
     restorePost,
+    sendNewsletter,
     type AdminStats,
     type AdminUser,
     type AdminPost,
@@ -20,12 +21,17 @@
   let { data } = $props();
   const user = data.user!;
 
-  let activeTab = $state<'stats' | 'users' | 'posts'>('stats');
+  let activeTab = $state<'stats' | 'users' | 'posts' | 'newsletter'>('stats');
   let stats = $state<AdminStats | null>(null);
   let users = $state<AdminUser[]>([]);
   let posts = $state<AdminPost[]>([]);
   let loading = $state(true);
   let error = $state('');
+
+  // Newsletter state
+  let showNewsletterModal = $state(false);
+  let newsletterSending = $state(false);
+  let newsletterResult = $state<{ sent: number; errors: number } | null>(null);
 
   async function loadData() {
     loading = true;
@@ -79,6 +85,19 @@
     posts = posts.map((p) => (p.id === id ? { ...p, isDeleted: false } : p));
   }
 
+  async function handleSendNewsletter() {
+    newsletterSending = true;
+    newsletterResult = null;
+    try {
+      const result = await sendNewsletter();
+      newsletterResult = { sent: result.sent, errors: result.errors };
+    } catch (err) {
+      newsletterResult = { sent: 0, errors: -1 };
+    } finally {
+      newsletterSending = false;
+    }
+  }
+
   onMount(() => {
     loadData();
   });
@@ -93,15 +112,15 @@
 
   <!-- Tabs -->
   <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border overflow-x-auto">
-    {#each ['stats', 'users', 'posts'] as tab}
+    {#each ['stats', 'users', 'posts', 'newsletter'] as tab}
       <button
-        onclick={() => (activeTab = tab as 'stats' | 'users' | 'posts')}
+        onclick={() => (activeTab = tab as 'stats' | 'users' | 'posts' | 'newsletter')}
         class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
           {activeTab === tab
           ? 'text-foreground border-b-2 border-accent'
           : 'text-muted-foreground hover:text-foreground'}"
       >
-        {tab === 'stats' ? 'Estadisticas' : tab === 'users' ? 'Usuarios' : 'Posts'}
+        {tab === 'stats' ? 'Estadisticas' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : 'Newsletter'}
       </button>
     {/each}
   </div>
@@ -232,5 +251,92 @@
         </table>
       </div>
     {/if}
+
+    <!-- Newsletter Tab -->
+    {#if activeTab === 'newsletter'}
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h2 class="text-lg font-semibold text-foreground mb-4">Newsletter Semanal</h2>
+        <p class="text-sm text-muted-foreground mb-6">
+          Envia manualmente el newsletter con los 5 posts mas votados de la semana a todos los usuarios suscritos.
+        </p>
+        <button
+          onclick={() => (showNewsletterModal = true)}
+          class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+        >
+          Enviar newsletter ahora
+        </button>
+      </div>
+    {/if}
   {/if}
 </div>
+
+<!-- Newsletter Confirmation Modal -->
+{#if showNewsletterModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-card border border-border rounded-xl p-6 max-w-md w-full">
+      {#if newsletterResult}
+        <!-- Result state -->
+        <div class="text-center">
+          {#if newsletterResult.errors === -1}
+            <div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+              <span class="text-error text-xl">!</span>
+            </div>
+            <h3 class="text-lg font-semibold text-foreground mb-2">Error</h3>
+            <p class="text-sm text-muted-foreground mb-6">Ocurrio un error al enviar el newsletter.</p>
+          {:else if newsletterResult.errors > 0}
+            <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center mx-auto mb-4">
+              <span class="text-warning text-xl">!</span>
+            </div>
+            <h3 class="text-lg font-semibold text-foreground mb-2">Envio parcial</h3>
+            <p class="text-sm text-muted-foreground mb-6">
+              Se enviaron {newsletterResult.sent} correos con {newsletterResult.errors} errores.
+            </p>
+          {:else}
+            <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
+              <span class="text-success text-xl">✓</span>
+            </div>
+            <h3 class="text-lg font-semibold text-foreground mb-2">Enviado</h3>
+            <p class="text-sm text-muted-foreground mb-6">
+              Se enviaron {newsletterResult.sent} correos exitosamente.
+            </p>
+          {/if}
+          <button
+            onclick={() => { showNewsletterModal = false; newsletterResult = null; }}
+            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+          >
+            Cerrar
+          </button>
+        </div>
+      {:else if newsletterSending}
+        <!-- Sending state -->
+        <div class="text-center">
+          <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span class="text-muted-foreground">...</span>
+          </div>
+          <h3 class="text-lg font-semibold text-foreground mb-2">Enviando...</h3>
+          <p class="text-sm text-muted-foreground">Esto puede tomar unos segundos.</p>
+        </div>
+      {:else}
+        <!-- Confirmation state -->
+        <h3 class="text-lg font-semibold text-foreground mb-2">Confirmar envio</h3>
+        <p class="text-sm text-muted-foreground mb-6">
+          Estas seguro de que quieres enviar el newsletter ahora? Se enviara a todos los usuarios suscritos con email verificado.
+        </p>
+        <div class="flex gap-3 justify-end">
+          <button
+            onclick={() => (showNewsletterModal = false)}
+            class="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onclick={handleSendNewsletter}
+            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+          >
+            Enviar
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
