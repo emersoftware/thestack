@@ -12,6 +12,7 @@ import admin from './routes/admin';
 import comments from './routes/comments';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
+import { sendWeeklyNewsletter } from './lib/newsletter';
 import type { Env } from './lib/auth';
 import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 
@@ -107,35 +108,52 @@ export default {
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const db = drizzle(env.DB, { schema });
-    const cutoffTime = new Date(Date.now() - 168 * 60 * 60 * 1000);
 
-    try {
-      const recentPosts = await db
-        .select({
-          id: schema.posts.id,
-          upvotesCount: schema.posts.upvotesCount,
-          createdAt: schema.posts.createdAt,
-        })
-        .from(schema.posts)
-        .where(
-          and(
-            gte(schema.posts.createdAt, cutoffTime),
-            eq(schema.posts.isDeleted, false)
-          )
-        );
+    // Score recalculation - runs every 10 minutes
+    if (event.cron === '*/10 * * * *') {
+      const cutoffTime = new Date(Date.now() - 168 * 60 * 60 * 1000);
 
-      for (const post of recentPosts) {
-        const newScore = calculateHNScore(post.upvotesCount, post.createdAt);
+      try {
+        const recentPosts = await db
+          .select({
+            id: schema.posts.id,
+            upvotesCount: schema.posts.upvotesCount,
+            createdAt: schema.posts.createdAt,
+          })
+          .from(schema.posts)
+          .where(
+            and(
+              gte(schema.posts.createdAt, cutoffTime),
+              eq(schema.posts.isDeleted, false)
+            )
+          );
 
-        await db
-          .update(schema.posts)
-          .set({ score: newScore })
-          .where(eq(schema.posts.id, post.id));
+        for (const post of recentPosts) {
+          const newScore = calculateHNScore(post.upvotesCount, post.createdAt);
+
+          await db
+            .update(schema.posts)
+            .set({ score: newScore })
+            .where(eq(schema.posts.id, post.id));
+        }
+
+        console.log(`[Cron] Updated scores for ${recentPosts.length} posts`);
+      } catch (error) {
+        console.error('[Cron] Error updating scores:', error);
       }
+    }
 
-      console.log(`[Cron] Updated scores for ${recentPosts.length} posts`);
-    } catch (error) {
-      console.error('[Cron] Error updating scores:', error);
+    // Weekly newsletter - runs Monday at 18:00 UTC (14:00 Chile)
+    if (event.cron === '0 18 * * 1') {
+      try {
+        console.log('[Cron] Starting weekly newsletter...');
+        const result = await sendWeeklyNewsletter(env);
+        console.log(
+          `[Cron] Newsletter completed: ${result.sent} sent, ${result.errors} errors`
+        );
+      } catch (error) {
+        console.error('[Cron] Error sending newsletter:', error);
+      }
     }
   },
 };

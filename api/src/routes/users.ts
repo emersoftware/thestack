@@ -10,11 +10,13 @@ const users = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 const updateUserSchema = z.object({
   about: z.string().max(500, 'Bio muy larga (max 500)').optional(),
+  newsletterEnabled: z.boolean().optional(),
 });
 
 users.get('/:username', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const username = c.req.param('username');
+  const currentUser = c.get('user') as AuthUser | undefined;
 
   try {
     const user = await db
@@ -23,6 +25,7 @@ users.get('/:username', async (c) => {
         karma: schema.users.karma,
         about: schema.users.about,
         createdAt: schema.users.createdAt,
+        newsletterEnabled: schema.users.newsletterEnabled,
       })
       .from(schema.users)
       .where(eq(schema.users.username, username))
@@ -32,9 +35,15 @@ users.get('/:username', async (c) => {
       return c.json({ error: 'Usuario no encontrado' }, 404);
     }
 
+    const isOwnProfile = currentUser?.username === username;
+
     return c.json({
-      ...user[0],
+      username: user[0].username,
+      karma: user[0].karma,
+      about: user[0].about,
       createdAt: user[0].createdAt ? new Date(user[0].createdAt).toISOString() : null,
+      // Only include newsletter preference for own profile
+      ...(isOwnProfile && { newsletterEnabled: user[0].newsletterEnabled }),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -128,14 +137,22 @@ users.put('/:username', requireAuth(), async (c) => {
       return c.json({ error: validation.error.issues[0].message }, 400);
     }
 
-    const about = validation.data.about || '';
+    const { about, newsletterEnabled } = validation.data;
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (about !== undefined) {
+      updateData.about = about;
+    }
+    if (newsletterEnabled !== undefined) {
+      updateData.newsletterEnabled = newsletterEnabled;
+    }
 
     await db
       .update(schema.users)
-      .set({ about, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(schema.users.id, user.id));
 
-    return c.json({ success: true, about });
+    return c.json({ success: true, about: about ?? '', newsletterEnabled });
   } catch (error) {
     console.error('Error updating user:', error);
     return c.json({ error: 'Error al actualizar perfil' }, 500);

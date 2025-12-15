@@ -16,6 +16,7 @@ export const users = sqliteTable(
     isAdmin: integer('is_admin', { mode: 'boolean' }).default(false),
     isBanned: integer('is_banned', { mode: 'boolean' }).default(false),
     isSuperAdmin: integer('is_super_admin', { mode: 'boolean' }).default(false),
+    newsletterEnabled: integer('newsletter_enabled', { mode: 'boolean' }).default(true).notNull(),
   },
   (table) => [
     uniqueIndex('idx_users_username').on(table.username),

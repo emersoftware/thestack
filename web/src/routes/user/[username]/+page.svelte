@@ -102,12 +102,20 @@
           </p>
         </div>
         {#if isOwnProfile && !editing}
-          <button
-            onclick={startEdit}
-            class="text-sm text-muted-foreground hover:text-foreground self-start"
-          >
-            editar
-          </button>
+          <div class="flex gap-3 self-start">
+            <button
+              onclick={startEdit}
+              class="text-sm text-muted-foreground hover:text-foreground"
+            >
+              editar
+            </button>
+            <a
+              href="/settings"
+              class="text-sm text-muted-foreground hover:text-foreground"
+            >
+              config
+            </a>
+          </div>
         {/if}
       </div>
 

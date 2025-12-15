@@ -1,7 +1,7 @@
 -- development seed for the stack
 --
 -- run with:
---   npx wrangler d1 execute the-stack-db --local --file=./migrations/seed-dev.sql
+--   npx wrangler d1 execute the-stack-db --local --file=./scripts/seed-dev.sql
 --
 -- after running the seed, recalculate scores:
 --   1. start server: npm run dev -- --test-scheduled
@@ -12,16 +12,16 @@
 -- =============================================
 
 INSERT INTO users (id, name, email, email_verified, username, karma, about, is_admin, is_banned, created_at, updated_at) VALUES
-('user_001', 'María González', 'maria@example.com', 1, 'mariag', 45, 'Desarrolladora frontend en Santiago', 1, 0, strftime('%s', 'now', '-30 days'), strftime('%s', 'now')),
-('user_002', 'Carlos Pérez', 'carlos@example.com', 1, 'carlosp', 32, 'Backend engineer. Go y Rust enthusiast.', 0, 0, strftime('%s', 'now', '-28 days'), strftime('%s', 'now')),
-('user_003', 'Ana Rodríguez', 'ana@example.com', 1, 'anar', 28, NULL, 0, 0, strftime('%s', 'now', '-25 days'), strftime('%s', 'now')),
-('user_004', 'Diego Silva', 'diego@example.com', 1, 'diegos', 15, 'Estudiante de ingeniería informática', 0, 0, strftime('%s', 'now', '-20 days'), strftime('%s', 'now')),
-('user_005', 'Valentina López', 'valentina@example.com', 1, 'valel', 52, 'CTO @ startup chilena. Ex-Google.', 0, 0, strftime('%s', 'now', '-18 days'), strftime('%s', 'now')),
-('user_006', 'Sebastián Torres', 'seba@example.com', 1, 'sebat', 8, NULL, 0, 0, strftime('%s', 'now', '-15 days'), strftime('%s', 'now')),
-('user_007', 'Camila Fernández', 'camila@example.com', 1, 'camilaf', 19, 'DevOps engineer. Kubernetes fan.', 0, 0, strftime('%s', 'now', '-12 days'), strftime('%s', 'now')),
-('user_008', 'Matías Vargas', 'matias@example.com', 1, 'matiasv', 5, NULL, 0, 0, strftime('%s', 'now', '-10 days'), strftime('%s', 'now')),
-('user_009', 'Javiera Muñoz', 'javiera@example.com', 1, 'javieram', 22, 'Mobile dev. Flutter y React Native.', 0, 0, strftime('%s', 'now', '-8 days'), strftime('%s', 'now')),
-('user_010', 'Felipe Contreras', 'felipe@example.com', 1, 'felipec', 3, NULL, 0, 0, strftime('%s', 'now', '-5 days'), strftime('%s', 'now'));
+('user_001', 'María González', 'delivered+maria@resend.dev', 1, 'mariag', 45, 'Desarrolladora frontend en Santiago', 1, 0, strftime('%s', 'now', '-30 days'), strftime('%s', 'now')),
+('user_002', 'Carlos Pérez', 'delivered+carlos@resend.dev', 1, 'carlosp', 32, 'Backend engineer. Go y Rust enthusiast.', 0, 0, strftime('%s', 'now', '-28 days'), strftime('%s', 'now')),
+('user_003', 'Ana Rodríguez', 'delivered+ana@resend.dev', 1, 'anar', 28, NULL, 0, 0, strftime('%s', 'now', '-25 days'), strftime('%s', 'now')),
+('user_004', 'Diego Silva', 'delivered+diego@resend.dev', 1, 'diegos', 15, 'Estudiante de ingeniería informática', 0, 0, strftime('%s', 'now', '-20 days'), strftime('%s', 'now')),
+('user_005', 'Valentina López', 'delivered+valentina@resend.dev', 1, 'valel', 52, 'CTO @ startup chilena. Ex-Google.', 0, 0, strftime('%s', 'now', '-18 days'), strftime('%s', 'now')),
+('user_006', 'Sebastián Torres', 'delivered+seba@resend.dev', 1, 'sebat', 8, NULL, 0, 0, strftime('%s', 'now', '-15 days'), strftime('%s', 'now')),
+('user_007', 'Camila Fernández', 'delivered+camila@resend.dev', 1, 'camilaf', 19, 'DevOps engineer. Kubernetes fan.', 0, 0, strftime('%s', 'now', '-12 days'), strftime('%s', 'now')),
+('user_008', 'Matías Vargas', 'delivered+matias@resend.dev', 1, 'matiasv', 5, NULL, 0, 0, strftime('%s', 'now', '-10 days'), strftime('%s', 'now')),
+('user_009', 'Javiera Muñoz', 'delivered+javiera@resend.dev', 1, 'javieram', 22, 'Mobile dev. Flutter y React Native.', 0, 0, strftime('%s', 'now', '-8 days'), strftime('%s', 'now')),
+('user_010', 'Felipe Contreras', 'delivered+felipe@resend.dev', 1, 'felipec', 3, NULL, 0, 0, strftime('%s', 'now', '-5 days'), strftime('%s', 'now'));
 
 -- =============================================
 -- 2. posts (~50 posts with different dates)
@@ -115,3 +115,61 @@ INSERT INTO post_upvotes (id, post_id, user_id, created_at) VALUES
 ('upvote_013', 'post_039', 'user_005', strftime('%s', 'now', '-4 hours')),
 ('upvote_014', 'post_047', 'user_003', strftime('%s', 'now', '-10 minutes')),
 ('upvote_015', 'post_003', 'user_002', strftime('%s', 'now', '-6 days'));
+
+-- =============================================
+-- 4. comments (~20 comments with nested replies)
+-- =============================================
+
+INSERT INTO comments (id, post_id, author_id, parent_id, content, upvotes_count, is_deleted, created_at, updated_at) VALUES
+-- Comments on post_035 (OpenAI lanza GPT-5) - popular post
+('comment_001', 'post_035', 'user_002', NULL, 'Impresionante el salto en reasoning. Lo probé y realmente entiende contexto mucho mejor que GPT-4.', 8, 0, strftime('%s', 'now', '-11 hours'), strftime('%s', 'now', '-11 hours')),
+('comment_002', 'post_035', 'user_005', 'comment_001', 'Coincido, pero el pricing es bastante alto para startups. Ojalá saquen una versión más accesible.', 5, 0, strftime('%s', 'now', '-10 hours'), strftime('%s', 'now', '-10 hours')),
+('comment_003', 'post_035', 'user_003', 'comment_002', 'Igual que con GPT-4, eventualmente bajan los precios. Hay que esperar unos meses.', 3, 0, strftime('%s', 'now', '-9 hours'), strftime('%s', 'now', '-9 hours')),
+('comment_004', 'post_035', 'user_007', NULL, 'Me preocupa el tema de la privacidad. ¿Alguien sabe si tienen opción de no entrenar con tus datos?', 4, 0, strftime('%s', 'now', '-8 hours'), strftime('%s', 'now', '-8 hours')),
+('comment_005', 'post_035', 'user_001', 'comment_004', 'Sí, tienen la opción en settings de la API. Por defecto está desactivado el training con datos de API.', 6, 0, strftime('%s', 'now', '-7 hours'), strftime('%s', 'now', '-7 hours')),
+
+-- Comments on post_018 (salarios tech Chile) - controversial topic
+('comment_006', 'post_018', 'user_004', NULL, 'Los números me parecen inflados. En regiones los sueldos son mucho más bajos.', 7, 0, strftime('%s', 'now', '-2 days', '+3 hours'), strftime('%s', 'now', '-2 days')),
+('comment_007', 'post_018', 'user_001', 'comment_006', 'El estudio es principalmente de Santiago. Sería bueno tener datos por región.', 4, 0, strftime('%s', 'now', '-2 days', '+4 hours'), strftime('%s', 'now', '-2 days')),
+('comment_008', 'post_018', 'user_009', NULL, 'Como mobile dev puedo confirmar que los rangos están bastante acertados para Santiago.', 3, 0, strftime('%s', 'now', '-2 days', '+5 hours'), strftime('%s', 'now', '-2 days')),
+('comment_009', 'post_018', 'user_002', 'comment_008', '¿En qué rango estás tú? Pregunto para comparar con backend.', 1, 0, strftime('%s', 'now', '-2 days', '+6 hours'), strftime('%s', 'now', '-2 days')),
+
+-- Comments on post_010 (problema microservicios)
+('comment_010', 'post_010', 'user_007', NULL, 'El artículo tiene razón. Hemos gastado meses migrando de monolito a microservicios y no valió la pena.', 9, 0, strftime('%s', 'now', '-4 days', '+2 hours'), strftime('%s', 'now', '-4 days')),
+('comment_011', 'post_010', 'user_005', 'comment_010', 'Depende del contexto. Para equipos grandes y productos maduros, microservicios hacen sentido.', 5, 0, strftime('%s', 'now', '-4 days', '+3 hours'), strftime('%s', 'now', '-4 days')),
+('comment_012', 'post_010', 'user_003', 'comment_011', '+1. El problema es que startups de 5 personas quieren arquitectura de Netflix.', 12, 0, strftime('%s', 'now', '-4 days', '+4 hours'), strftime('%s', 'now', '-4 days')),
+
+-- Comments on post_022 (Netflix millones requests)
+('comment_013', 'post_022', 'user_006', NULL, 'Excelente deep dive técnico. La parte de caching es oro puro.', 4, 0, strftime('%s', 'now', '-1 days', '+2 hours'), strftime('%s', 'now', '-1 days')),
+('comment_014', 'post_022', 'user_004', NULL, 'Me gustaría ver más contenido así de empresas chilenas. ¿Alguien conoce blogs técnicos locales?', 2, 0, strftime('%s', 'now', '-1 days', '+4 hours'), strftime('%s', 'now', '-1 days')),
+('comment_015', 'post_022', 'user_001', 'comment_014', 'Fintual tiene un blog técnico bastante bueno: https://tech.fintual.com', 3, 0, strftime('%s', 'now', '-1 days', '+5 hours'), strftime('%s', 'now', '-1 days')),
+
+-- Comments on post_037 (Cursor vs Copilot)
+('comment_016', 'post_037', 'user_002', NULL, 'Uso Cursor hace 3 meses y no vuelvo a Copilot. La integración con el proyecto es muy superior.', 6, 0, strftime('%s', 'now', '-7 hours'), strftime('%s', 'now', '-7 hours')),
+('comment_017', 'post_037', 'user_008', 'comment_016', '¿Vale la pena el precio de Cursor Pro? Estoy en el free tier todavía.', 2, 0, strftime('%s', 'now', '-6 hours'), strftime('%s', 'now', '-6 hours')),
+('comment_018', 'post_037', 'user_002', 'comment_017', 'Si programas más de 4 horas al día, 100% vale la pena. Se paga solo en productividad.', 4, 0, strftime('%s', 'now', '-5 hours'), strftime('%s', 'now', '-5 hours')),
+
+-- Comments on post_039 (Cloudflare D1)
+('comment_019', 'post_039', 'user_001', NULL, 'Por fin! Estábamos esperando esto para migrar de PlanetScale.', 3, 0, strftime('%s', 'now', '-4 hours'), strftime('%s', 'now', '-4 hours')),
+('comment_020', 'post_039', 'user_005', 'comment_019', '¿Cómo manejan las migraciones? Drizzle tiene buen soporte para D1.', 2, 0, strftime('%s', 'now', '-3 hours'), strftime('%s', 'now', '-3 hours'));
+
+-- =============================================
+-- 5. comment upvotes (~15 upvotes on comments)
+-- =============================================
+
+INSERT INTO comment_upvotes (id, comment_id, user_id, created_at) VALUES
+('cupvote_001', 'comment_001', 'user_003', strftime('%s', 'now', '-10 hours')),
+('cupvote_002', 'comment_001', 'user_005', strftime('%s', 'now', '-9 hours')),
+('cupvote_003', 'comment_001', 'user_007', strftime('%s', 'now', '-8 hours')),
+('cupvote_004', 'comment_002', 'user_001', strftime('%s', 'now', '-9 hours')),
+('cupvote_005', 'comment_002', 'user_003', strftime('%s', 'now', '-8 hours')),
+('cupvote_006', 'comment_005', 'user_002', strftime('%s', 'now', '-6 hours')),
+('cupvote_007', 'comment_005', 'user_007', strftime('%s', 'now', '-5 hours')),
+('cupvote_008', 'comment_010', 'user_001', strftime('%s', 'now', '-4 days')),
+('cupvote_009', 'comment_010', 'user_002', strftime('%s', 'now', '-4 days')),
+('cupvote_010', 'comment_012', 'user_001', strftime('%s', 'now', '-4 days')),
+('cupvote_011', 'comment_012', 'user_002', strftime('%s', 'now', '-4 days')),
+('cupvote_012', 'comment_012', 'user_007', strftime('%s', 'now', '-4 days')),
+('cupvote_013', 'comment_016', 'user_001', strftime('%s', 'now', '-6 hours')),
+('cupvote_014', 'comment_016', 'user_005', strftime('%s', 'now', '-5 hours')),
+('cupvote_015', 'comment_018', 'user_009', strftime('%s', 'now', '-4 hours'));

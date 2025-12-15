@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Theme Preview - The Stack</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .panel {
+      flex: 1;
+      padding: 24px;
+    }
+
+    .light {
+      --background: #f5f5f5;
+      --foreground: #171717;
+      --card: #f5f5f5;
+      --card-foreground: #141414;
+      --muted: #f5f5f5;
+      --muted-foreground: #737373;
+      --border: #e5e5e5;
+      --border-hover: #141414;
+      --input: #e5e5e5;
+      --accent: #141414;
+      --accent-foreground: #f5f5f5;
+      --success: #4d7c5f;
+      --error: #9b4d4d;
+      --info: #4d6a9b;
+      --warning: #9b7a4d;
+    }
+
+    .dark {
+      --background: #0a1a0f;
+      --foreground: #b8e6c1;
+      --card: #0a1a0f;
+      --card-foreground: #b8e6c1;
+      --muted: #12291a;
+      --muted-foreground: #6b9c77;
+      --border: #1a3d24;
+      --border-hover: #3d7a4a;
+      --input: #12291a;
+      --accent: #4ade80;
+      --accent-foreground: #0a1a0f;
+      --success: #4ade80;
+      --error: #f87171;
+      --info: #60a5fa;
+      --warning: #fbbf24;
+    }
+
+    .panel {
+      background: var(--background);
+      color: var(--foreground);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h2 {
+      font-size: 14px;
+      color: var(--muted-foreground);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    /* Color swatches */
+    .colors {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-color {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-info {
+      font-size: 12px;
+    }
+
+    .swatch-name {
+      font-weight: 500;
+    }
+
+    .swatch-hex {
+      color: var(--muted-foreground);
+    }
+
+    /* Post card */
+    .post-card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .post-card:hover {
+      border-color: var(--border-hover);
+    }
+
+    .post-title {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .post-meta {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      display: flex;
+      gap: 8px;
+    }
+
+    .domain {
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--muted-foreground);
+    }
+
+    /* Buttons */
+    .buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: var(--accent-foreground);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--border-hover);
+    }
+
+    /* Input */
+    .input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--input);
+      color: var(--foreground);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .input::placeholder {
+      color: var(--muted-foreground);
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Alerts */
+    .alerts {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .alert {
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .alert-success {
+      background: color-mix(in srgb, var(--success) 15%, transparent);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .alert-error {
+      background: color-mix(in srgb, var(--error) 15%, transparent);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .alert-info {
+      background: color-mix(in srgb, var(--info) 15%, transparent);
+      border: 1px solid var(--info);
+      color: var(--info);
+    }
+
+    .alert-warning {
+      background: color-mix(in srgb, var(--warning) 15%, transparent);
+      border: 1px solid var(--warning);
+      color: var(--warning);
+    }
+
+    /* Logo */
+    .logo {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 16px;
+    }
+
+    .logo-bg {
+      fill: var(--accent);
+    }
+
+    .logo-fg {
+      fill: var(--accent-foreground);
+    }
+  </style>
+</head>
+<body>
+  <!-- Light Mode -->
+  <div class="panel light">
+    <svg class="logo" viewBox="0 0 40 40">
+      <rect x="0" y="0" width="40" height="40" rx="6" class="logo-bg"/>
+      <rect x="2" y="2" width="15" height="10" rx="4" class="logo-fg"/>
+      <rect x="2" y="14" width="20" height="20" rx="4" class="logo-fg"/>
+    </svg>
+
+    <h1>Light Mode</h1>
+
+    <div class="section">
+      <h2>Colores</h2>
+      <div class="colors">
+        <div class="swatch">
+          <div class="swatch-color" style="background: #f5f5f5"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">background</div>
+            <div class="swatch-hex">#f5f5f5</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #171717"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">foreground</div>
+            <div class="swatch-hex">#171717</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #737373"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">muted-foreground</div>
+            <div class="swatch-hex">#737373</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #e5e5e5"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">border</div>
+            <div class="swatch-hex">#e5e5e5</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #141414"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">accent</div>
+            <div class="swatch-hex">#141414</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #4d7c5f"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">success</div>
+            <div class="swatch-hex">#4d7c5f</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #9b4d4d"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">error</div>
+            <div class="swatch-hex">#9b4d4d</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #4d6a9b"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">info</div>
+            <div class="swatch-hex">#4d6a9b</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Post Card</h2>
+      <div class="post-card">
+        <div class="post-title">Show HN: The Stack - Hacker News para Latam</div>
+        <div class="post-meta">
+          <span>42 puntos</span>
+          <span>·</span>
+          <span>hace 3h</span>
+          <span>·</span>
+          <span>@usuario</span>
+          <span class="domain">github.com</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Input</h2>
+      <input type="text" class="input" placeholder="Escribe algo...">
+    </div>
+
+    <div class="section">
+      <h2>Botones</h2>
+      <div class="buttons">
+        <button class="btn btn-accent">Publicar</button>
+        <button class="btn btn-outline">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Alertas</h2>
+      <div class="alerts">
+        <div class="alert alert-success">Post publicado exitosamente</div>
+        <div class="alert alert-error">Error al publicar</div>
+        <div class="alert alert-info">Verifica tu email</div>
+        <div class="alert alert-warning">Rate limit alcanzado</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dark Mode -->
+  <div class="panel dark">
+    <svg class="logo" viewBox="0 0 40 40">
+      <rect x="0" y="0" width="40" height="40" rx="6" class="logo-bg"/>
+      <rect x="2" y="2" width="15" height="10" rx="4" class="logo-fg"/>
+      <rect x="2" y="14" width="20" height="20" rx="4" class="logo-fg"/>
+    </svg>
+
+    <h1>Dark Mode</h1>
+
+    <div class="section">
+      <h2>Colores</h2>
+      <div class="colors">
+        <div class="swatch">
+          <div class="swatch-color" style="background: #0a1a0f"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">background</div>
+            <div class="swatch-hex">#0a1a0f</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #b8e6c1"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">foreground</div>
+            <div class="swatch-hex">#b8e6c1</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #6b9c77"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">muted-foreground</div>
+            <div class="swatch-hex">#6b9c77</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #1a3d24"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">border</div>
+            <div class="swatch-hex">#1a3d24</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #4ade80"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">accent</div>
+            <div class="swatch-hex">#4ade80</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #4ade80"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">success</div>
+            <div class="swatch-hex">#4ade80</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #f87171"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">error</div>
+            <div class="swatch-hex">#f87171</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background: #60a5fa"></div>
+          <div class="swatch-info">
+            <div class="swatch-name">info</div>
+            <div class="swatch-hex">#60a5fa</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Post Card</h2>
+      <div class="post-card">
+        <div class="post-title">Show HN: The Stack - Hacker News para Latam</div>
+        <div class="post-meta">
+          <span>42 puntos</span>
+          <span>·</span>
+          <span>hace 3h</span>
+          <span>·</span>
+          <span>@usuario</span>
+          <span class="domain">github.com</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Input</h2>
+      <input type="text" class="input" placeholder="Escribe algo...">
+    </div>
+
+    <div class="section">
+      <h2>Botones</h2>
+      <div class="buttons">
+        <button class="btn btn-accent">Publicar</button>
+        <button class="btn btn-outline">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Alertas</h2>
+      <div class="alerts">
+        <div class="alert alert-success">Post publicado exitosamente</div>
+        <div class="alert alert-error">Error al publicar</div>
+        <div class="alert alert-info">Verifica tu email</div>
+        <div class="alert alert-warning">Rate limit alcanzado</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

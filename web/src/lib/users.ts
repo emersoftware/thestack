@@ -6,6 +6,7 @@ export interface UserProfile {
   karma: number;
   about: string | null;
   createdAt: string;
+  newsletterEnabled?: boolean;
 }
 
 export interface UserPostsResponse {
@@ -33,5 +34,15 @@ export async function updateUserAbout(
   return apiFetch(`/api/users/${encodeURIComponent(username)}`, {
     method: 'PUT',
     body: JSON.stringify({ about }),
+  });
+}
+
+export async function updateNewsletterPreference(
+  username: string,
+  newsletterEnabled: boolean
+): Promise<{ success: boolean; newsletterEnabled: boolean }> {
+  return apiFetch(`/api/users/${encodeURIComponent(username)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ newsletterEnabled }),
   });
 }
