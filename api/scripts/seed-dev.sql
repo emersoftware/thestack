@@ -12,6 +12,8 @@
 -- =============================================
 
 INSERT INTO users (id, name, email, email_verified, username, karma, about, is_admin, is_banned, created_at, updated_at) VALUES
+-- Admin user (password: 123457890 - sin el 6)
+('user_admin', 'Admin', 'admin@thestack.cl', 1, 'admin', 100, 'Administrador de The Stack', 1, 0, strftime('%s', 'now', '-60 days'), strftime('%s', 'now')),
 ('user_001', 'María González', 'delivered+maria@resend.dev', 1, 'mariag', 45, 'Desarrolladora frontend en Santiago', 1, 0, strftime('%s', 'now', '-30 days'), strftime('%s', 'now')),
 ('user_002', 'Carlos Pérez', 'delivered+carlos@resend.dev', 1, 'carlosp', 32, 'Backend engineer. Go y Rust enthusiast.', 0, 0, strftime('%s', 'now', '-28 days'), strftime('%s', 'now')),
 ('user_003', 'Ana Rodríguez', 'delivered+ana@resend.dev', 1, 'anar', 28, NULL, 0, 0, strftime('%s', 'now', '-25 days'), strftime('%s', 'now')),
@@ -22,6 +24,13 @@ INSERT INTO users (id, name, email, email_verified, username, karma, about, is_a
 ('user_008', 'Matías Vargas', 'delivered+matias@resend.dev', 1, 'matiasv', 5, NULL, 0, 0, strftime('%s', 'now', '-10 days'), strftime('%s', 'now')),
 ('user_009', 'Javiera Muñoz', 'delivered+javiera@resend.dev', 1, 'javieram', 22, 'Mobile dev. Flutter y React Native.', 0, 0, strftime('%s', 'now', '-8 days'), strftime('%s', 'now')),
 ('user_010', 'Felipe Contreras', 'delivered+felipe@resend.dev', 1, 'felipec', 3, NULL, 0, 0, strftime('%s', 'now', '-5 days'), strftime('%s', 'now'));
+
+-- =============================================
+-- 1.5 accounts (for credential login)
+-- =============================================
+
+INSERT INTO accounts (id, user_id, account_id, provider_id, password, created_at, updated_at) VALUES
+('acc_admin', 'user_admin', 'user_admin', 'credential', 'ae5241c8bd26ee91b5a1975d329416fc:35593a176afa49528ab64126bf2302bcf56cb73bf527eaa8d074fbd44fb797815256b8a43fec5a090c27b8d292b7444b7ca1d8c61226fb7663883a7c18578e4b', strftime('%s', 'now', '-60 days'), strftime('%s', 'now'));
 
 -- =============================================
 -- 2. posts (~50 posts with different dates)
