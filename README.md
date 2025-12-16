@@ -72,5 +72,5 @@ Haz mover la rueda de nuestra industria en Latam
 </p>
 
 <p align="center">
-  apoyado por <a href="https://indies.cl"><img src="web/static/indies.png" alt="indies.cl" width="16" height="16" style="vertical-align: middle;"> indies.cl</a>
+  apoyado por <a href="https://indies.cl"><img src="web/static/indies.png" alt="indies.cl" width="16" height="16"></a> <a href="https://indies.cl">indies.cl</a>
 </p>
