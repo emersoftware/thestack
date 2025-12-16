@@ -1,3 +1,7 @@
+<script lang="ts">
+  import Footer from '$lib/components/Footer.svelte';
+</script>
+
 <svelte:head>
   <title>Lineamientos | The Stack</title>
   <meta name="description" content="Lineamientos de la comunidad de The Stack" />
@@ -70,3 +74,5 @@
     </p>
   </div>
 </div>
+
+<Footer />
