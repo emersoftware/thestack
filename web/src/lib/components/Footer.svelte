@@ -1,4 +1,4 @@
-<footer class="w-full max-w-4xl mx-auto px-4 py-4 mt-auto">
+<footer class="w-full max-w-4xl mx-auto px-4 py-4 mt-4">
   <div class="flex justify-center items-center gap-2 text-xs text-muted-foreground">
     <span>apoyado por</span>
     <a
