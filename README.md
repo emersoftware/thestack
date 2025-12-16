@@ -58,12 +58,19 @@ Haz mover la rueda de nuestra industria en Latam
 ## Roadmap
 
 - Reportes: sobre posts que no cumplan las normas ni lineamientos
-- Handpicked list: curar a mano los mejores post
 - Post endpoint: habilitar un ep para postear, automatizaciones, etc
-- Comentarios: al igual que HN, discutir sobre un post
+- Posts en redes sociales
+- RSS
+- ~~Newsletter~~
+- ~~DARK MODE~~
+- ~~Comentarios: al igual que HN, discutir sobre un post~~
 
 ---
 
 <p align="center">
   <a href="https://thestack.cl">thestack.cl</a>
+</p>
+
+<p align="center">
+  apoyado por <a href="https://indies.cl"><img src="web/static/indies.png" alt="indies.cl" width="16" height="16" style="vertical-align: middle;"> indies.cl</a>
 </p>
