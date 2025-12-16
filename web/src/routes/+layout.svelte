@@ -3,6 +3,7 @@
   import { PUBLIC_API_URL } from '$env/static/public';
   import '../app.css';
   import Header from '$lib/components/Header.svelte';
+  import Footer from '$lib/components/Footer.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import KeyboardNav from '$lib/components/KeyboardNav.svelte';
 
@@ -31,7 +32,10 @@
 
 <div class="min-h-screen p-2 sm:p-3 bg-background flex flex-col">
   <Header user={data.user} />
-  {@render children()}
+  <div class="flex-1">
+    {@render children()}
+  </div>
+  <Footer />
 </div>
 
 <Toast />
