@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, desc, and, sql, gte } from 'drizzle-orm';
+import { eq, desc, and, sql, gte, inArray } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { extractDomain, generateId, isValidUrl, calculateHNScore } from '../lib/utils';
@@ -16,6 +16,7 @@ const createPostSchema = z.object({
 
 posts.get('/', async (c) => {
   const db = drizzle(c.env.DB, { schema });
+  const user = c.get('user');
   const sort = c.req.query('sort') || 'hot';
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = 30;
@@ -48,6 +49,22 @@ posts.get('/', async (c) => {
     const hasMore = postsResult.length > limit;
     const postsToReturn = hasMore ? postsResult.slice(0, limit) : postsResult;
 
+    // If user is authenticated, fetch their upvotes for these posts
+    let userUpvotes = new Set<string>();
+    if (user && postsToReturn.length > 0) {
+      const postIds = postsToReturn.map((p) => p.id);
+      const upvotes = await db
+        .select({ postId: schema.postUpvotes.postId })
+        .from(schema.postUpvotes)
+        .where(
+          and(
+            eq(schema.postUpvotes.userId, user.id),
+            inArray(schema.postUpvotes.postId, postIds)
+          )
+        );
+      userUpvotes = new Set(upvotes.map((u) => u.postId));
+    }
+
     const formattedPosts = postsToReturn.map((post) => ({
       id: post.id,
       title: post.title,
@@ -60,6 +77,7 @@ posts.get('/', async (c) => {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
       },
+      ...(user && { hasUpvoted: userUpvotes.has(post.id) }),
     }));
 
     return c.json({ posts: formattedPosts, hasMore });
@@ -93,6 +111,7 @@ posts.get('/my-upvotes', async (c) => {
 
 posts.get('/:id', async (c) => {
   const db = drizzle(c.env.DB, { schema });
+  const user = c.get('user');
   const postId = c.req.param('id');
 
   try {
@@ -117,6 +136,22 @@ posts.get('/:id', async (c) => {
       return c.json({ error: 'Post no encontrado' }, 404);
     }
 
+    // Check if user has upvoted this post
+    let hasUpvoted = false;
+    if (user) {
+      const upvote = await db
+        .select({ id: schema.postUpvotes.id })
+        .from(schema.postUpvotes)
+        .where(
+          and(
+            eq(schema.postUpvotes.postId, postId),
+            eq(schema.postUpvotes.userId, user.id)
+          )
+        )
+        .limit(1);
+      hasUpvoted = upvote.length > 0;
+    }
+
     const post = result[0];
     return c.json({
       id: post.id,
@@ -130,6 +165,7 @@ posts.get('/:id', async (c) => {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
       },
+      ...(user && { hasUpvoted }),
     });
   } catch (error) {
     console.error('Error fetching post:', error);

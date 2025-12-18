@@ -5,17 +5,20 @@
   import { getUpvoteStatus } from '$lib/votes';
 
   let { data }: { data: PageData } = $props();
-  let hasUpvoted = $state(false);
+  // Initialize from server-provided hasUpvoted, fallback to false
+  let hasUpvoted = $state(data.post.hasUpvoted ?? false);
 
-  // Load upvote status client-side (requires auth cookies)
+  // Only fetch upvote status client-side if not provided by server
   $effect(() => {
-    getUpvoteStatus(data.post.id)
-      .then((status) => {
-        hasUpvoted = status;
-      })
-      .catch(() => {
-        hasUpvoted = false;
-      });
+    if (data.post.hasUpvoted === undefined) {
+      getUpvoteStatus(data.post.id)
+        .then((status) => {
+          hasUpvoted = status;
+        })
+        .catch(() => {
+          hasUpvoted = false;
+        });
+    }
   });
 </script>
 

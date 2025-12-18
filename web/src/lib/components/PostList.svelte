@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { getPosts, type Post } from '$lib/posts';
   import { getMyUpvotedPostIds } from '$lib/votes';
   import { useSession } from '$lib/auth';
@@ -20,11 +19,16 @@
   const user = $derived($session.data?.user);
 
   let posts = $state<Post[]>(initialPosts);
-  let myUpvotes = $state<Set<string>>(new Set());
+  // Initialize upvotes from server-provided hasUpvoted field
+  let myUpvotes = $state<Set<string>>(
+    new Set(initialPosts.filter((p) => p.hasUpvoted).map((p) => p.id))
+  );
   let loadingMore = $state(false);
   let error = $state('');
   let page = $state(1);
   let hasMore = $state(initialHasMore);
+  // Track if we have server-provided upvote data
+  let hasServerUpvotes = $state(initialPosts.some((p) => p.hasUpvoted !== undefined));
 
   async function loadMore() {
     if (loadingMore || !hasMore) return;
@@ -34,6 +38,12 @@
       const response = await getPosts(sort, page);
       posts = [...posts, ...response.posts];
       hasMore = response.hasMore;
+      // Add new upvotes from loaded posts
+      response.posts.forEach((p) => {
+        if (p.hasUpvoted) {
+          myUpvotes = new Set([...myUpvotes, p.id]);
+        }
+      });
     } catch (err) {
       error = err instanceof Error ? err.message : 'Error al cargar posts';
     } finally {
@@ -41,15 +51,9 @@
     }
   }
 
-  onMount(async () => {
-    // Fetch upvotes client-side (requires auth cookies)
-    const upvotedIds = await getMyUpvotedPostIds().catch(() => []);
-    myUpvotes = new Set(upvotedIds);
-  });
-
-  // Refetch upvotes when user changes
+  // Only refetch upvotes when user changes and we don't have server data
   $effect(() => {
-    if (user) {
+    if (user && !hasServerUpvotes) {
       getMyUpvotedPostIds()
         .then((ids) => {
           myUpvotes = new Set(ids);
@@ -57,7 +61,9 @@
         .catch(() => {
           myUpvotes = new Set();
         });
-    } else {
+    } else if (!user && !hasServerUpvotes) {
+      // Only reset if we don't have server data
+      // (prevents clearing SSR upvotes during hydration)
       myUpvotes = new Set();
     }
   });

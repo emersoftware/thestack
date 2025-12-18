@@ -4,10 +4,13 @@ import type { Post } from '$lib/posts';
 import type { Comment } from '$lib/comments';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, fetch }) => {
+export const load: PageServerLoad = async ({ params, fetch, request }) => {
+  const cookieHeader = request.headers.get('cookie');
+  const headers: HeadersInit = cookieHeader ? { cookie: cookieHeader } : {};
+
   const [postRes, commentsRes] = await Promise.all([
-    fetch(`${PUBLIC_API_URL}/api/posts/${params.id}`),
-    fetch(`${PUBLIC_API_URL}/api/comments/post/${params.id}`)
+    fetch(`${PUBLIC_API_URL}/api/posts/${params.id}`, { headers }),
+    fetch(`${PUBLIC_API_URL}/api/comments/post/${params.id}`, { headers })
   ]);
 
   if (!postRes.ok) {

@@ -23,34 +23,51 @@
 
   let profile = $state<UserProfile | null>(data.profile);
   let posts = $state<Post[]>(data.posts);
-  let myUpvotes = $state<Set<string>>(new Set());
+  // Initialize upvotes from server-provided hasUpvoted field
+  let myUpvotes = $state<Set<string>>(
+    new Set(data.posts.filter((p) => p.hasUpvoted).map((p) => p.id))
+  );
   let loadingMore = $state(false);
   let error = $state(data.profile ? '' : 'Usuario no encontrado');
   let pageNum = $state(1);
   let hasMore = $state(data.hasMore);
+  // Track if we have server-provided upvote data
+  let hasServerUpvotes = $state(data.posts.some((p) => p.hasUpvoted !== undefined));
 
   let editing = $state(false);
   let editAbout = $state('');
   let saving = $state(false);
 
-  // Load upvotes client-side
+  // Only fetch upvotes client-side if not provided by server
   $effect(() => {
-    getMyUpvotedPostIds()
-      .then((ids) => {
-        myUpvotes = new Set(ids);
-      })
-      .catch(() => {
-        myUpvotes = new Set();
-      });
+    if (currentUser && !hasServerUpvotes) {
+      getMyUpvotedPostIds()
+        .then((ids) => {
+          myUpvotes = new Set(ids);
+        })
+        .catch(() => {
+          myUpvotes = new Set();
+        });
+    } else if (!currentUser && !hasServerUpvotes) {
+      // Only reset if we don't have server data
+      // (prevents clearing SSR upvotes during hydration)
+      myUpvotes = new Set();
+    }
   });
 
   async function loadMore() {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || !username) return;
     loadingMore = true;
     pageNum += 1;
-    const data = await getUserPosts(username, pageNum);
-    posts = [...posts, ...data.posts];
-    hasMore = data.hasMore;
+    const newData = await getUserPosts(username, pageNum);
+    posts = [...posts, ...newData.posts];
+    hasMore = newData.hasMore;
+    // Add new upvotes from loaded posts
+    newData.posts.forEach((p) => {
+      if (p.hasUpvoted) {
+        myUpvotes = new Set([...myUpvotes, p.id]);
+      }
+    });
     loadingMore = false;
   }
 
@@ -60,6 +77,7 @@
   }
 
   async function saveAbout() {
+    if (!username) return;
     saving = true;
     try {
       await updateUserAbout(username, editAbout);

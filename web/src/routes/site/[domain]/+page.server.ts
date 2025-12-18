@@ -2,10 +2,12 @@ import { PUBLIC_API_URL } from '$env/static/public';
 import type { SitePostsResponse } from '$lib/sites';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, fetch }) => {
+export const load: PageServerLoad = async ({ params, fetch, request }) => {
   try {
+    const cookieHeader = request.headers.get('cookie');
     const response = await fetch(
-      `${PUBLIC_API_URL}/api/sites/${encodeURIComponent(params.domain)}/posts?page=1`
+      `${PUBLIC_API_URL}/api/sites/${encodeURIComponent(params.domain)}/posts?page=1`,
+      { headers: cookieHeader ? { cookie: cookieHeader } : {} }
     );
 
     if (!response.ok) {

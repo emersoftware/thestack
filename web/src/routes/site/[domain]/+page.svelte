@@ -3,6 +3,7 @@
   import type { PageData } from './$types';
   import { getSitePosts } from '$lib/sites';
   import { getMyUpvotedPostIds } from '$lib/votes';
+  import { useSession } from '$lib/auth';
   import type { Post } from '$lib/posts';
   import PostCard from '$lib/components/PostCard.svelte';
   import LoadMoreButton from '$lib/components/LoadMoreButton.svelte';
@@ -10,31 +11,50 @@
   let { data }: { data: PageData } = $props();
 
   const domain = $derived($page.params.domain);
+  const session = useSession();
+  const user = $derived($session.data?.user);
 
   let posts = $state<Post[]>(data.posts);
-  let myUpvotes = $state<Set<string>>(new Set());
+  // Initialize upvotes from server-provided hasUpvoted field
+  let myUpvotes = $state<Set<string>>(
+    new Set(data.posts.filter((p) => p.hasUpvoted).map((p) => p.id))
+  );
   let loadingMore = $state(false);
   let pageNum = $state(1);
   let hasMore = $state(data.hasMore);
+  // Track if we have server-provided upvote data
+  let hasServerUpvotes = $state(data.posts.some((p) => p.hasUpvoted !== undefined));
 
-  // Load upvotes client-side
+  // Only fetch upvotes client-side if not provided by server
   $effect(() => {
-    getMyUpvotedPostIds()
-      .then((ids) => {
-        myUpvotes = new Set(ids);
-      })
-      .catch(() => {
-        myUpvotes = new Set();
-      });
+    if (user && !hasServerUpvotes) {
+      getMyUpvotedPostIds()
+        .then((ids) => {
+          myUpvotes = new Set(ids);
+        })
+        .catch(() => {
+          myUpvotes = new Set();
+        });
+    } else if (!user && !hasServerUpvotes) {
+      // Only reset if we don't have server data
+      // (prevents clearing SSR upvotes during hydration)
+      myUpvotes = new Set();
+    }
   });
 
   async function loadMore() {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || !domain) return;
     loadingMore = true;
     pageNum += 1;
     const siteData = await getSitePosts(domain, pageNum);
     posts = [...posts, ...siteData.posts];
     hasMore = siteData.hasMore;
+    // Add new upvotes from loaded posts
+    siteData.posts.forEach((p) => {
+      if (p.hasUpvoted) {
+        myUpvotes = new Set([...myUpvotes, p.id]);
+      }
+    });
     loadingMore = false;
   }
 </script>

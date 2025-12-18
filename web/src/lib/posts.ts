@@ -12,6 +12,7 @@ export interface Post {
   upvotesCount: number;
   score: number;
   createdAt: string;
+  hasUpvoted?: boolean;
 }
 
 export interface PostsResponse {

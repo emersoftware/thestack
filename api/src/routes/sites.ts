@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, inArray } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
+import { type AuthVariables } from '../middleware/auth';
 
-const sites = new Hono<{ Bindings: Env }>();
+const sites = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 sites.get('/:domain/posts', async (c) => {
   const db = drizzle(c.env.DB, { schema });
+  const user = c.get('user');
   const domain = c.req.param('domain');
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = 30;
@@ -47,6 +49,22 @@ sites.get('/:domain/posts', async (c) => {
     const hasMore = posts.length > limit;
     const postsToReturn = hasMore ? posts.slice(0, limit) : posts;
 
+    // If user is authenticated, fetch their upvotes for these posts
+    let userUpvotes = new Set<string>();
+    if (user && postsToReturn.length > 0) {
+      const postIds = postsToReturn.map((p) => p.id);
+      const upvotes = await db
+        .select({ postId: schema.postUpvotes.postId })
+        .from(schema.postUpvotes)
+        .where(
+          and(
+            eq(schema.postUpvotes.userId, user.id),
+            inArray(schema.postUpvotes.postId, postIds)
+          )
+        );
+      userUpvotes = new Set(upvotes.map((u) => u.postId));
+    }
+
     return c.json({
       domain,
       totalPosts,
@@ -62,6 +80,7 @@ sites.get('/:domain/posts', async (c) => {
           id: p.authorId,
           username: p.authorUsername || 'unknown',
         },
+        ...(user && { hasUpvoted: userUpvotes.has(p.id) }),
       })),
       hasMore,
     });
