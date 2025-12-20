@@ -99,21 +99,21 @@
   class="bg-card rounded-xl py-3 pl-3 pr-3 sm:pl-4 border border-border hover:border-border-hover transition-colors duration-200 w-full sm:w-fit"
 >
   <div class="flex flex-col gap-2">
-    <div class="flex items-start sm:items-center justify-between gap-2">
+    <div>
+      <a
+        href="/site/{post.domain}"
+        class="float-right ml-2 mb-0 sm:mb-1 text-xs border-input border text-muted-foreground hover:border-border-hover hover:text-foreground transition-colors duration-200 px-2 py-0.5 sm:py-1 rounded-full max-w-[40%] truncate"
+      >
+        {post.domain}
+      </a>
       <a
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
         data-nav-link
-        class="hover:underline text-foreground hover:text-muted-foreground text-sm leading-snug break-words sm:truncate sm:max-w-md"
+        class="hover:underline text-foreground hover:text-muted-foreground text-sm leading-snug break-words sm:max-w-2xl"
       >
         {post.title}
-      </a>
-      <a
-        href="/site/{post.domain}"
-        class="text-xs shrink-0 border-input border text-muted-foreground hover:border-border-hover hover:text-foreground transition-colors duration-200 px-2 py-1 m-0 rounded-full max-w-[120px] truncate"
-      >
-        {post.domain}
       </a>
     </div>
     <div class="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground flex-wrap">
