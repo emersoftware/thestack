@@ -35,8 +35,8 @@
   function handleKeydown(e: KeyboardEvent) {
     const target = e.target as HTMLElement;
 
-    // Always handle ? for help modal toggle
-    if (e.key === '?') {
+    // Handle ? for help modal toggle (except in text inputs)
+    if (e.key === '?' && target.tagName !== 'TEXTAREA' && target.tagName !== 'INPUT' && !target.isContentEditable) {
       e.preventDefault();
       showHelp = !showHelp;
       return;
