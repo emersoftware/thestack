@@ -15,7 +15,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.user) {
+        if (data?.user) {
           event.locals.user = data.user;
         }
       }
