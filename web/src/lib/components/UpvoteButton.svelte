@@ -8,7 +8,7 @@
   }: {
     count?: number;
     active?: boolean;
-    onclick?: () => void;
+    onclick?: (e: MouseEvent) => void;
     disabled?: boolean;
     loading?: boolean;
   } = $props();

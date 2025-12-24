@@ -22,8 +22,8 @@ export const GET: RequestHandler = async ({ params }) => {
     <img src="${logoBase64}" width="50" height="50" />
     <span style="margin-left: 16px; font-size: 32px; font-weight: 600; color: #141414;">the stack</span>
   </div>
-  <span style="font-size: 48px; font-weight: 700; color: #141414; text-align: center;">${escapeHtml(title)}</span>
-  <span style="font-size: 24px; color: #666666; text-align: center;">${escapeHtml(subtitle)}</span>
+  <span style="font-size: 48px; font-weight: 700; color: #141414; text-align: center;">${title}</span>
+  <span style="font-size: 24px; color: #666666; text-align: center;">${subtitle}</span>
 </div>`;
 
   return new ImageResponse(html, {
@@ -31,12 +31,3 @@ export const GET: RequestHandler = async ({ params }) => {
     height: 630
   });
 };
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
