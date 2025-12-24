@@ -93,46 +93,47 @@
   }
 </script>
 
-<article
+<a
+  href="/post/{post.id}"
   data-nav-item
   data-nav-id={post.id}
-  class="bg-card rounded-xl py-3 pl-3 pr-3 sm:pl-4 border border-border hover:border-border-hover transition-colors duration-200 w-full sm:w-fit"
+  data-nav-link
+  class="block bg-card rounded-xl py-3 pl-3 pr-3 sm:pl-4 border border-border hover:border-border-hover transition-colors duration-200 w-full sm:w-fit"
 >
-  <div class="flex flex-col gap-2">
+  <article class="flex flex-col gap-2">
     <div>
-      <a
-        href="/site/{post.domain}"
+      <button
+        type="button"
+        onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/site/${post.domain}`); }}
         class="float-right ml-2 mb-0 sm:mb-1 text-xs border-input border text-muted-foreground hover:border-border-hover hover:text-foreground transition-colors duration-200 px-2 py-0.5 sm:py-1 rounded-full max-w-[40%] truncate"
       >
         {post.domain}
-      </a>
-      <a
-        href={post.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        data-nav-link
-        class="hover:underline text-foreground hover:text-muted-foreground text-sm leading-snug break-words sm:max-w-2xl"
-      >
+      </button>
+      <span class="hover:underline text-foreground hover:text-muted-foreground text-sm leading-snug break-words sm:max-w-2xl">
         {post.title}
-      </a>
+      </span>
     </div>
     <div class="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground flex-wrap">
       <UpvoteButton
         count={optimisticCount}
         active={optimisticUpvoted}
-        onclick={handleUpvote}
+        onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpvote(); }}
         {loading}
       />
       <span class="hidden sm:inline">·</span>
       <span>{getRelativeTime(post.createdAt)}</span>
       <span>·</span>
-      <a href="/user/{post.author.username}" class="hover:text-foreground truncate max-w-[100px] sm:max-w-none">
+      <button
+        type="button"
+        onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/user/${post.author.username}`); }}
+        class="hover:text-foreground truncate max-w-[100px] sm:max-w-none"
+      >
         {post.author.username}
-      </a>
+      </button>
       <span>·</span>
-      <a href="/post/{post.id}" data-nav-comments class="hover:text-foreground">
+      <span data-nav-comments class="hover:text-foreground">
         comentarios
-      </a>
+      </span>
     </div>
-  </div>
-</article>
+  </article>
+</a>

@@ -87,37 +87,42 @@
   }
 </script>
 
-<article class="bg-card border border-border rounded-xl p-4">
-  <div class="flex justify-between items-start gap-2">
+<a
+  href={post.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="block bg-card border border-border hover:border-border-hover transition-colors duration-200 rounded-xl p-4"
+>
+  <article class="flex justify-between items-start gap-2">
     <div>
-      <a
-        href={post.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-lg text-foreground hover:underline"
-      >
+      <span class="text-lg text-foreground hover:underline">
         {post.title}
-      </a>
+      </span>
       <div class="flex items-center gap-2 text-xs text-muted-foreground mt-4">
         <UpvoteButton
           count={optimisticCount}
           active={optimisticUpvoted}
-          onclick={handleUpvote}
+          onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpvote(); }}
           {loading}
         />
         <span>·</span>
         <span>{getRelativeTime(post.createdAt)}</span>
         <span>·</span>
-        <a href="/user/{post.author.username}" class="hover:text-foreground">
+        <button
+          type="button"
+          onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/user/${post.author.username}`); }}
+          class="hover:text-foreground"
+        >
           {post.author.username}
-        </a>
+        </button>
       </div>
     </div>
-    <a
-      href="/site/{post.domain}"
+    <button
+      type="button"
+      onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/site/${post.domain}`); }}
       class="text-xs shrink-0 border-input border text-muted-foreground hover:border-border-hover hover:text-foreground transition-colors duration-200 px-2 py-1 rounded-full max-w-[120px] truncate"
     >
       {post.domain}
-    </a>
-  </div>
-</article>
+    </button>
+  </article>
+</a>
