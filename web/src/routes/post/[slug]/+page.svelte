@@ -26,7 +26,7 @@
   <title>{data.post.title} - the stack</title>
   <meta property="og:title" content={data.post.title} />
   <meta property="og:description" content={`${data.post.domain} · @${data.post.author.username}`} />
-  <meta property="og:url" content={`https://thestack.cl/post/${data.post.id}`} />
+  <meta property="og:url" content={`https://thestack.cl/post/${data.post.slug || data.post.id}`} />
   <meta property="og:image" content={`https://thestack.cl/og/post/${data.post.id}`} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />

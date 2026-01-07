@@ -130,7 +130,7 @@
         {post.author.username}
       </a>
       <span>·</span>
-      <a href="/post/{post.id}" data-nav-comments class="hover:text-foreground">
+      <a href="/post/{post.slug || post.id}" data-nav-comments class="hover:text-foreground">
         comentarios
       </a>
     </div>

@@ -2,6 +2,7 @@ import { apiFetch } from './api';
 
 export interface Post {
   id: string;
+  slug: string | null;
   title: string;
   url: string;
   domain: string;

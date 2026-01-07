@@ -81,6 +81,7 @@ export const posts = sqliteTable(
   {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
+    slug: text('slug').unique(),
     url: text('url').notNull().unique(),
     domain: text('domain').notNull(),
     authorId: text('author_id')
@@ -97,6 +98,7 @@ export const posts = sqliteTable(
     index('idx_posts_domain').on(table.domain),
     index('idx_posts_score').on(table.score),
     index('idx_posts_created_at').on(table.createdAt),
+    uniqueIndex('idx_posts_slug').on(table.slug),
   ]
 );
 

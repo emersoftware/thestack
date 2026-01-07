@@ -47,3 +47,35 @@ export function calculateHNScore(upvotes: number, createdAt: Date): number {
   const score = (Math.max(0, upvotes - 1) + BOOST) / Math.pow(ageInHours + 2, GRAVITY);
   return score;
 }
+
+/**
+ * convert a title to a URL-safe slug
+ * - converts to lowercase
+ * - normalizes accents (café → cafe)
+ * - replaces dots with hyphens (5.5 → 5-5)
+ * - removes special characters
+ * - replaces spaces with hyphens
+ * - limits to 100 characters
+ */
+export function generateSlug(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // remove accents
+    .replace(/\./g, '-')               // dots → hyphens (5.5 → 5-5)
+    .replace(/[^a-z0-9\s-]/g, '')      // remove special chars
+    .replace(/\s+/g, '-')              // spaces → hyphens
+    .replace(/-+/g, '-')               // multiple hyphens → single
+    .replace(/^-|-$/g, '')             // trim hyphens from ends
+    .slice(0, 100);
+
+  return slug || 'post';
+}
+
+/**
+ * check if a string is a valid UUID
+ */
+export function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}

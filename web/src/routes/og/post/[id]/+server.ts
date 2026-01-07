@@ -5,7 +5,9 @@ import { ImageResponse } from '@ethercorps/sveltekit-og';
 export const GET: RequestHandler = async ({ params }) => {
   const postRes = await fetch(`${PUBLIC_API_URL}/api/posts/${params.id}`);
 
-  if (!postRes.ok) {
+  // API returns 301 with full post data for UUID lookups, or 200 for slug lookups
+  // Both include the post data we need
+  if (!postRes.ok && postRes.status !== 301) {
     return new Response('Post not found', { status: 404 });
   }
 

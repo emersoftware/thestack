@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, sql, desc } from 'drizzle-orm';
+import { eq, sql, desc, isNull } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
 import { sendWeeklyNewsletter } from '../lib/newsletter';
+import { generateSlug } from '../lib/utils';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -334,6 +335,59 @@ admin.post('/newsletter/send', async (c) => {
   } catch (error) {
     console.error('Error sending newsletter:', error);
     return c.json({ error: 'Error al enviar newsletter' }, 500);
+  }
+});
+
+// Migrate slugs for existing posts (one-time migration)
+admin.post('/migrate-slugs', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+
+  try {
+    // Get all posts without slugs
+    const postsWithoutSlugs = await db
+      .select({ id: schema.posts.id, title: schema.posts.title })
+      .from(schema.posts)
+      .where(isNull(schema.posts.slug));
+
+    if (postsWithoutSlugs.length === 0) {
+      return c.json({ message: 'No posts to migrate', migrated: 0 });
+    }
+
+    // Track used slugs for collision handling
+    const slugCounts = new Map<string, number>();
+
+    // Get existing slugs to avoid collisions
+    const existingSlugs = await db
+      .select({ slug: schema.posts.slug })
+      .from(schema.posts);
+
+    for (const { slug } of existingSlugs) {
+      if (slug) {
+        const baseSlug = slug.replace(/-\d+$/, '');
+        slugCounts.set(baseSlug, (slugCounts.get(baseSlug) || 0) + 1);
+      }
+    }
+
+    let migrated = 0;
+    for (const post of postsWithoutSlugs) {
+      const baseSlug = generateSlug(post.title);
+      const count = slugCounts.get(baseSlug) || 0;
+
+      const slug = count === 0 ? baseSlug : `${baseSlug}-${count + 1}`;
+      slugCounts.set(baseSlug, count + 1);
+
+      await db
+        .update(schema.posts)
+        .set({ slug })
+        .where(eq(schema.posts.id, post.id));
+
+      migrated++;
+    }
+
+    return c.json({ message: 'Migration completed', migrated });
+  } catch (error) {
+    console.error('Error migrating slugs:', error);
+    return c.json({ error: 'Error al migrar slugs' }, 500);
   }
 });
 

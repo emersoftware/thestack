@@ -4,7 +4,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, desc, and, sql, gte, inArray } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
-import { extractDomain, generateId, isValidUrl, calculateHNScore } from '../lib/utils';
+import { extractDomain, generateId, isValidUrl, calculateHNScore, isUUID } from '../lib/utils';
+import { generateUniqueSlug } from '../lib/slug';
 import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const posts = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
@@ -30,6 +31,7 @@ posts.get('/', async (c) => {
     const postsResult = await db
       .select({
         id: schema.posts.id,
+        slug: schema.posts.slug,
         title: schema.posts.title,
         url: schema.posts.url,
         domain: schema.posts.domain,
@@ -67,6 +69,7 @@ posts.get('/', async (c) => {
 
     const formattedPosts = postsToReturn.map((post) => ({
       id: post.id,
+      slug: post.slug,
       title: post.title,
       url: post.url,
       domain: post.domain,
@@ -109,15 +112,21 @@ posts.get('/my-upvotes', async (c) => {
   }
 });
 
-posts.get('/:id', async (c) => {
+posts.get('/:identifier', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const user = c.get('user');
-  const postId = c.req.param('id');
+  const identifier = c.req.param('identifier');
+  const isLookupByUUID = isUUID(identifier);
 
   try {
+    const whereClause = isLookupByUUID
+      ? and(eq(schema.posts.id, identifier), eq(schema.posts.isDeleted, false))
+      : and(eq(schema.posts.slug, identifier), eq(schema.posts.isDeleted, false));
+
     const result = await db
       .select({
         id: schema.posts.id,
+        slug: schema.posts.slug,
         title: schema.posts.title,
         url: schema.posts.url,
         domain: schema.posts.domain,
@@ -129,12 +138,14 @@ posts.get('/:id', async (c) => {
       })
       .from(schema.posts)
       .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .where(and(eq(schema.posts.id, postId), eq(schema.posts.isDeleted, false)))
+      .where(whereClause)
       .limit(1);
 
     if (result.length === 0) {
       return c.json({ error: 'Post no encontrado' }, 404);
     }
+
+    const post = result[0];
 
     // Check if user has upvoted this post
     let hasUpvoted = false;
@@ -144,7 +155,7 @@ posts.get('/:id', async (c) => {
         .from(schema.postUpvotes)
         .where(
           and(
-            eq(schema.postUpvotes.postId, postId),
+            eq(schema.postUpvotes.postId, post.id),
             eq(schema.postUpvotes.userId, user.id)
           )
         )
@@ -152,9 +163,9 @@ posts.get('/:id', async (c) => {
       hasUpvoted = upvote.length > 0;
     }
 
-    const post = result[0];
-    return c.json({
+    const postData = {
       id: post.id,
+      slug: post.slug,
       title: post.title,
       url: post.url,
       domain: post.domain,
@@ -166,7 +177,15 @@ posts.get('/:id', async (c) => {
         username: post.authorUsername || 'unknown',
       },
       ...(user && { hasUpvoted }),
-    });
+    };
+
+    // If looked up by UUID, return post data with redirect flag (301)
+    // This allows clients to either redirect or use the data directly
+    if (isLookupByUUID && post.slug) {
+      return c.json({ redirect: true, slug: post.slug, ...postData }, 301);
+    }
+
+    return c.json(postData);
   } catch (error) {
     console.error('Error fetching post:', error);
     return c.json({ error: 'Error al obtener post' }, 500);
@@ -225,6 +244,8 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
       return c.json({ error: 'URL inválida' }, 400);
     }
 
+    const slug = await generateUniqueSlug(db, title);
+
     const existingPost = await db
       .select({ id: schema.posts.id })
       .from(schema.posts)
@@ -247,6 +268,7 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
       db.insert(schema.posts).values({
         id: postId,
         title,
+        slug,
         url,
         domain,
         authorId: user.id,
@@ -271,6 +293,7 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     const createdPost = await db
       .select({
         id: schema.posts.id,
+        slug: schema.posts.slug,
         title: schema.posts.title,
         url: schema.posts.url,
         domain: schema.posts.domain,
@@ -288,6 +311,7 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     const post = createdPost[0];
     return c.json({
       id: post.id,
+      slug: post.slug,
       title: post.title,
       url: post.url,
       domain: post.domain,
