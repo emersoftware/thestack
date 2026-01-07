@@ -88,7 +88,7 @@
       return `hace ${weeks} ${weeks === 1 ? 'semana' : 'semanas'}`;
     }
 
-    const months = Math.floor(days / 30);
+    const months = Math.max(1, Math.floor(days / 30));
     return `hace ${months} ${months === 1 ? 'mes' : 'meses'}`;
   }
 </script>
