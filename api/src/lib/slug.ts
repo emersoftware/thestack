@@ -1,4 +1,4 @@
-import { like } from 'drizzle-orm';
+import { and, gte, lt } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { generateSlug } from './utils';
 import * as schema from '../db/schema';
@@ -13,10 +13,17 @@ export async function generateUniqueSlug(
 ): Promise<string> {
   const baseSlug = generateSlug(title);
 
+  // Use range query instead of LIKE to avoid "pattern too complex" SQLite error
+  // This finds all slugs that start with baseSlug by using range comparison
   const existingSlugs = await db
     .select({ slug: schema.posts.slug })
     .from(schema.posts)
-    .where(like(schema.posts.slug, `${baseSlug}%`));
+    .where(
+      and(
+        gte(schema.posts.slug, baseSlug),
+        lt(schema.posts.slug, baseSlug + '\uffff')
+      )
+    );
 
   const slugSet = new Set(
     existingSlugs.map((p) => p.slug).filter((s): s is string => s !== null)

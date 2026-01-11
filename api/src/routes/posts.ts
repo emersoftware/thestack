@@ -182,7 +182,7 @@ posts.get('/:identifier', async (c) => {
     // If looked up by UUID, return post data with redirect flag (301)
     // This allows clients to either redirect or use the data directly
     if (isLookupByUUID && post.slug) {
-      return c.json({ redirect: true, slug: post.slug, ...postData }, 301);
+      return c.json({ redirect: true, ...postData }, 301);
     }
 
     return c.json(postData);
