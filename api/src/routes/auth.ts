@@ -90,6 +90,24 @@ function removeStateCookies(cookieHeader: string | null): string {
 auth.on(['GET', 'POST'], '/*', async (c) => {
   const authInstance = createAuth(c.env);
 
+  // Helper to add CORS headers to better-auth responses
+  // better-auth returns Response directly, bypassing Hono's CORS middleware
+  const addCorsHeaders = (response: Response): Response => {
+    const origin = c.req.header('origin');
+    const allowed = [c.env.FRONTEND_URL, 'https://thestack.cl'].filter(Boolean);
+    const allowedOrigin = allowed.includes(origin ?? '') ? origin : allowed[0];
+
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('Access-Control-Allow-Origin', allowedOrigin ?? '');
+    newHeaders.set('Access-Control-Allow-Credentials', 'true');
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders,
+    });
+  };
+
   // TEMPORARY: Cookie filtering for cross-subdomain migration
   // Can be removed after 2025-12-18
   if (c.env.ENVIRONMENT === 'production') {
@@ -114,12 +132,14 @@ auth.on(['GET', 'POST'], '/*', async (c) => {
 
         // Use Request constructor with existing request as base - handles body cloning internally
         const newRequest = new Request(c.req.raw, { headers: newHeaders });
-        return authInstance.handler(newRequest);
+        const response = await authInstance.handler(newRequest);
+        return addCorsHeaders(response);
       }
     }
   }
 
-  return authInstance.handler(c.req.raw);
+  const response = await authInstance.handler(c.req.raw);
+  return addCorsHeaders(response);
 });
 
 export default auth;
