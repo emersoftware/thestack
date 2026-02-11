@@ -34,7 +34,7 @@ ENVIRONMENT = "production"
 FRONTEND_URL = "https://thestack.cl"
 
 [env.production.triggers]
-crons = ["*/10 * * * *", "0 18 * * 2"]
+crons = ["*/10 * * * *", "0 18 * * MON"]
 
 [env.production.observability]
 [env.production.observability.logs]
