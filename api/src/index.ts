@@ -144,7 +144,7 @@ export default {
     }
 
     // Weekly newsletter - runs Monday at 18:00 UTC (15:00 Chile summer / 14:00 Chile winter)
-    if (event.cron === '0 18 * * 2') {
+    if (event.cron === '0 18 * * MON') {
       try {
         console.log('[Cron] Starting weekly newsletter...');
         const result = await sendWeeklyNewsletter(env);
