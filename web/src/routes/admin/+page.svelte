@@ -12,6 +12,9 @@
     deletePost,
     restorePost,
     sendNewsletter,
+    getNewsletterStatus,
+    getNewsletterSends,
+    upsertNewsletterDraft,
     getAnalyticsOverview,
     getPostsPerDay,
     getRegistrationsPerDay,
@@ -27,6 +30,8 @@
     type AdminPost,
     type AnalyticsOverview,
     type DayCount,
+    type NewsletterStatus,
+    type NewsletterSendItem,
   } from '$lib/admin';
 
   let { data } = $props();
@@ -43,6 +48,15 @@
   let showNewsletterModal = $state(false);
   let newsletterSending = $state(false);
   let newsletterResult = $state<{ sent: number; errors: number } | null>(null);
+  let nlStatus = $state<NewsletterStatus | null>(null);
+  let nlSends = $state<NewsletterSendItem[]>([]);
+  let nlSubject = $state('');
+  let nlSubjectSaving = $state(false);
+  let nlSubjectSaved = $state(false);
+  let nlCountdown = $state('');
+  let nlLoading = $state(false);
+  let nlTabLoaded = $state(false);
+  let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
   // Analytics state
   const now = new Date();
@@ -138,8 +152,10 @@
     newsletterSending = true;
     newsletterResult = null;
     try {
-      const result = await sendNewsletter();
+      const result = await sendNewsletter(nlStatus?.currentDraft?.id);
       newsletterResult = { sent: result.sent, errors: result.errors };
+      // Reload newsletter data after send
+      await loadNewsletterTab();
     } catch (err) {
       newsletterResult = { sent: 0, errors: -1 };
     } finally {
@@ -147,9 +163,83 @@
     }
   }
 
+  async function loadNewsletterTab() {
+    nlLoading = true;
+    try {
+      const [status, sendsData] = await Promise.all([
+        getNewsletterStatus(),
+        getNewsletterSends(),
+      ]);
+      nlStatus = status;
+      nlSends = sendsData.sends;
+      nlSubject = status.currentDraft?.subject ?? '';
+      startCountdown(status.secondsUntilNextSend);
+    } catch (err) {
+      console.error('Error loading newsletter tab:', err);
+    } finally {
+      nlLoading = false;
+      nlTabLoaded = true;
+    }
+  }
+
+  function startCountdown(seconds: number) {
+    if (countdownInterval) clearInterval(countdownInterval);
+    let remaining = seconds;
+    updateCountdownDisplay(remaining);
+    countdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(countdownInterval);
+        nlCountdown = 'Ahora';
+      } else {
+        updateCountdownDisplay(remaining);
+      }
+    }, 1000);
+  }
+
+  function updateCountdownDisplay(seconds: number) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    const parts: string[] = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    parts.push(`${s}s`);
+    nlCountdown = parts.join(' ');
+  }
+
+  async function handleSaveSubject() {
+    if (!nlSubject.trim()) return;
+    nlSubjectSaving = true;
+    nlSubjectSaved = false;
+    try {
+      await upsertNewsletterDraft(nlSubject);
+      nlSubjectSaved = true;
+      // Refresh status to get updated draft
+      const status = await getNewsletterStatus();
+      nlStatus = status;
+      setTimeout(() => (nlSubjectSaved = false), 3000);
+    } catch (err) {
+      console.error('Error saving subject:', err);
+    } finally {
+      nlSubjectSaving = false;
+    }
+  }
+
+  $effect(() => {
+    if (activeTab === 'newsletter' && !nlTabLoaded) {
+      loadNewsletterTab();
+    }
+  });
+
   onMount(() => {
     loadData();
     loadAnalytics();
+    return () => {
+      if (countdownInterval) clearInterval(countdownInterval);
+    };
   });
 </script>
 
@@ -576,18 +666,102 @@
 
     <!-- Newsletter Tab -->
     {#if activeTab === 'newsletter'}
-      <div class="bg-card border border-border rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-foreground mb-4">Newsletter Semanal</h2>
-        <p class="text-sm text-muted-foreground mb-6">
-          Envia manualmente el newsletter con los 5 posts mas votados de la semana a todos los usuarios suscritos.
-        </p>
-        <button
-          onclick={() => (showNewsletterModal = true)}
-          class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
-        >
-          Enviar newsletter ahora
-        </button>
-      </div>
+      {#if nlLoading && !nlTabLoaded}
+        <p class="text-muted-foreground text-center py-8">Cargando newsletter...</p>
+      {:else}
+        <!-- Proximo envio -->
+        <div class="bg-card border border-border rounded-xl p-6 mb-4">
+          <h3 class="text-sm font-semibold text-foreground mb-3">Proximo envio</h3>
+          <div class="flex flex-wrap items-baseline gap-4">
+            <span class="text-2xl font-bold text-foreground font-mono">{nlCountdown}</span>
+            {#if nlStatus}
+              <span class="text-sm text-muted-foreground">
+                {new Date(nlStatus.nextSendAt).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
+              </span>
+              <span class="text-sm text-muted-foreground">
+                &middot; {nlStatus.activeSubscribers} suscriptores
+              </span>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Asunto -->
+        <div class="bg-card border border-border rounded-xl p-6 mb-4">
+          <div class="flex items-center gap-3 mb-3">
+            <h3 class="text-sm font-semibold text-foreground">Asunto</h3>
+            {#if nlStatus?.currentDraft}
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-info/10 text-info border border-info/20">Borrador guardado</span>
+            {:else}
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Sin borrador</span>
+            {/if}
+            {#if nlSubjectSaved}
+              <span class="text-[10px] text-success">Guardado</span>
+            {/if}
+          </div>
+          <div class="flex gap-2">
+            <input
+              type="text"
+              bind:value={nlSubject}
+              placeholder="Asunto del newsletter..."
+              class="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+            />
+            <button
+              onclick={handleSaveSubject}
+              disabled={nlSubjectSaving || !nlSubject.trim()}
+              class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {nlSubjectSaving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Enviar ahora -->
+        <div class="bg-card border border-border rounded-xl p-6 mb-4">
+          <h3 class="text-sm font-semibold text-foreground mb-3">Enviar ahora</h3>
+          <p class="text-sm text-muted-foreground mb-4">
+            Envia el newsletter con los 5 posts mas votados de la semana a todos los suscriptores.
+          </p>
+          <button
+            onclick={() => (showNewsletterModal = true)}
+            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+          >
+            Enviar newsletter ahora
+          </button>
+        </div>
+
+        <!-- Historial de envios -->
+        {#if nlSends.length > 0}
+          <div class="bg-card border border-border rounded-xl p-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Historial de envios</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs sm:text-sm">
+                <thead>
+                  <tr class="border-b border-border">
+                    <th class="text-left py-2 text-foreground font-medium">Fecha</th>
+                    <th class="text-left py-2 text-foreground font-medium">Asunto</th>
+                    <th class="text-right py-2 text-foreground font-medium">Enviados</th>
+                    <th class="text-right py-2 text-foreground font-medium">Abiertos</th>
+                    <th class="text-right py-2 text-foreground font-medium">Open Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each nlSends as s}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-2 text-foreground whitespace-nowrap">
+                        {s.sentAt ? new Date(s.sentAt).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                      </td>
+                      <td class="py-2 text-foreground truncate max-w-[250px]">{s.subject}</td>
+                      <td class="py-2 text-right text-muted-foreground">{s.recipientCount ?? '-'}</td>
+                      <td class="py-2 text-right text-muted-foreground">{s.openedCount}</td>
+                      <td class="py-2 text-right text-muted-foreground">{s.openRate}%</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/if}
+      {/if}
     {/if}
   {/if}
 </div>

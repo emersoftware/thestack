@@ -69,8 +69,45 @@ export interface NewsletterResult {
   errors: number;
 }
 
-export async function sendNewsletter(): Promise<NewsletterResult> {
-  return apiFetch('/api/admin/newsletter/send', { method: 'POST' });
+export interface NewsletterSendItem {
+  id: string;
+  subject: string;
+  status: 'draft' | 'scheduled' | 'sent';
+  sentAt: string | null;
+  recipientCount: number | null;
+  openedCount: number;
+  openRate: number;
+}
+
+export interface NewsletterStatus {
+  activeSubscribers: number;
+  nextSendAt: string;
+  secondsUntilNextSend: number;
+  currentDraft: NewsletterSendItem | null;
+}
+
+export async function getNewsletterStatus(): Promise<NewsletterStatus> {
+  return apiFetch('/api/admin/newsletter/status');
+}
+
+export async function getNewsletterSends(): Promise<{ sends: NewsletterSendItem[] }> {
+  return apiFetch('/api/admin/newsletter/sends');
+}
+
+export async function upsertNewsletterDraft(subject: string): Promise<NewsletterSendItem> {
+  return apiFetch('/api/admin/newsletter/draft', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject }),
+  });
+}
+
+export async function sendNewsletter(sendId?: string): Promise<NewsletterResult & { sendId: string }> {
+  return apiFetch('/api/admin/newsletter/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sendId }),
+  });
 }
 
 // ─── Analytics ───

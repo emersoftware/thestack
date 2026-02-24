@@ -1,5 +1,5 @@
 import { drizzle, DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq, gte, desc } from 'drizzle-orm';
+import { and, eq, gte, desc, or, sql } from 'drizzle-orm';
 import { Resend } from 'resend';
 import * as schema from '../db/schema';
 import type { Env } from './auth';
@@ -38,6 +38,38 @@ export function getWeeklySubject(): string {
 }
 
 /**
+ * Get next Monday at 18:00 UTC
+ */
+export function getNextMondayAt18UTC(): Date {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+  let daysUntilMonday = (1 - day + 7) % 7;
+  if (daysUntilMonday === 0) {
+    // If today is Monday, check if we've already passed 18:00 UTC
+    if (now.getUTCHours() >= 18) {
+      daysUntilMonday = 7;
+    }
+  }
+  const next = new Date(now);
+  next.setUTCDate(next.getUTCDate() + daysUntilMonday);
+  next.setUTCHours(18, 0, 0, 0);
+  return next;
+}
+
+/**
+ * Get the start of the current week (Monday 00:00 UTC)
+ */
+function getCurrentWeekStart(): Date {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(now);
+  monday.setUTCDate(monday.getUTCDate() + diff);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday;
+}
+
+/**
  * Get the top 5 most upvoted posts from the last 7 days
  */
 export async function getWeeklyTopPosts(
@@ -68,9 +100,6 @@ export async function getWeeklyTopPosts(
 
 /**
  * Get all users who are eligible to receive the newsletter
- * - Email verified
- * - Newsletter enabled
- * - Not banned
  */
 export async function getNewsletterSubscribers(
   db: DrizzleD1Database<typeof schema>
@@ -91,6 +120,56 @@ export async function getNewsletterSubscribers(
     );
 
   return subscribers;
+}
+
+/**
+ * Create or find the weekly draft for this week
+ */
+export async function createWeeklyDraft(
+  env: Env
+): Promise<schema.NewsletterSend> {
+  const db = drizzle(env.DB, { schema });
+  const weekStart = getCurrentWeekStart();
+
+  // Check if draft/scheduled already exists for this week
+  const [existing] = await db
+    .select()
+    .from(schema.newsletterSends)
+    .where(
+      and(
+        or(
+          eq(schema.newsletterSends.status, 'draft'),
+          eq(schema.newsletterSends.status, 'scheduled')
+        ),
+        gte(schema.newsletterSends.createdAt, weekStart)
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    return existing;
+  }
+
+  const now = new Date();
+  const nextMonday = getNextMondayAt18UTC();
+  const id = crypto.randomUUID();
+  const subject = getWeeklySubject();
+
+  await db.insert(schema.newsletterSends).values({
+    id,
+    subject,
+    status: 'scheduled',
+    scheduledFor: nextMonday,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const [created] = await db
+    .select()
+    .from(schema.newsletterSends)
+    .where(eq(schema.newsletterSends.id, id));
+
+  return created;
 }
 
 /**
@@ -214,9 +293,6 @@ export function generateNewsletterHTML(posts: NewsletterPost[], frontendUrl: str
   `;
 }
 
-/**
- * Helper function to escape HTML entities
- */
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
     '&': '&amp;',
@@ -228,9 +304,6 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
 }
 
-/**
- * Helper function to split array into chunks
- */
 function chunkArray<T>(array: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < array.length; i += size) {
@@ -243,21 +316,71 @@ function chunkArray<T>(array: T[], size: number): T[][] {
  * Main function to send the weekly newsletter
  */
 export async function sendWeeklyNewsletter(
-  env: Env
-): Promise<{ sent: number; errors: number }> {
+  env: Env,
+  sendId?: string
+): Promise<{ sent: number; errors: number; sendId: string }> {
   const db = drizzle(env.DB, { schema });
   const resend = new Resend(env.RESEND_API_KEY);
 
   let totalSent = 0;
   let totalErrors = 0;
+  let send: schema.NewsletterSend | undefined;
 
   try {
+    // Resolve the send record
+    if (sendId) {
+      const [found] = await db
+        .select()
+        .from(schema.newsletterSends)
+        .where(eq(schema.newsletterSends.id, sendId))
+        .limit(1);
+      if (!found) throw new Error(`Send ${sendId} not found`);
+      if (found.status === 'sent') throw new Error(`Send ${sendId} already sent`);
+      send = found;
+    } else {
+      // Look for existing draft/scheduled for this week
+      const weekStart = getCurrentWeekStart();
+      const [existing] = await db
+        .select()
+        .from(schema.newsletterSends)
+        .where(
+          and(
+            or(
+              eq(schema.newsletterSends.status, 'draft'),
+              eq(schema.newsletterSends.status, 'scheduled')
+            ),
+            gte(schema.newsletterSends.createdAt, weekStart)
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        send = existing;
+      } else {
+        // Create one on the fly
+        const now = new Date();
+        const id = crypto.randomUUID();
+        await db.insert(schema.newsletterSends).values({
+          id,
+          subject: getWeeklySubject(),
+          status: 'draft',
+          createdAt: now,
+          updatedAt: now,
+        });
+        const [created] = await db
+          .select()
+          .from(schema.newsletterSends)
+          .where(eq(schema.newsletterSends.id, id));
+        send = created;
+      }
+    }
+
     // Get top 5 posts from the week
     const posts = await getWeeklyTopPosts(db);
 
     if (posts.length === 0) {
       console.log('[Newsletter] No posts from this week, skipping newsletter');
-      return { sent: 0, errors: 0 };
+      return { sent: 0, errors: 0, sendId: send.id };
     }
 
     // Get eligible subscribers
@@ -265,14 +388,14 @@ export async function sendWeeklyNewsletter(
 
     if (subscribers.length === 0) {
       console.log('[Newsletter] No eligible subscribers, skipping newsletter');
-      return { sent: 0, errors: 0 };
+      return { sent: 0, errors: 0, sendId: send.id };
     }
 
     console.log(
       `[Newsletter] Sending to ${subscribers.length} subscribers with ${posts.length} posts`
     );
 
-    const subject = getWeeklySubject();
+    const subject = send.subject;
     const sendDate = new Date();
     const apiBaseUrl = env.FRONTEND_URL.replace('thestack.cl', 'api.thestack.cl').replace('localhost:5173', 'localhost:8787');
 
@@ -290,11 +413,23 @@ export async function sendWeeklyNewsletter(
           userId: subscriber.id,
           sendDate,
           openedAt: null,
+          sendId: send.id,
         });
       } catch {
         // Continue even if insert fails
       }
     }
+
+    // Update send status
+    await db
+      .update(schema.newsletterSends)
+      .set({
+        status: 'sent',
+        sentAt: sendDate,
+        recipientCount: subscribers.length,
+        updatedAt: sendDate,
+      })
+      .where(eq(schema.newsletterSends.id, send.id));
 
     // Split subscribers into chunks of 100 for batch sending
     const BATCH_SIZE = 100;
@@ -345,5 +480,5 @@ export async function sendWeeklyNewsletter(
     console.error('[Newsletter] Fatal error:', error);
   }
 
-  return { sent: totalSent, errors: totalErrors };
+  return { sent: totalSent, errors: totalErrors, sendId: send!.id };
 }

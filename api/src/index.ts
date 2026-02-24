@@ -13,7 +13,7 @@ import comments from './routes/comments';
 import track from './routes/track';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
-import { sendWeeklyNewsletter } from './lib/newsletter';
+import { sendWeeklyNewsletter, createWeeklyDraft } from './lib/newsletter';
 import type { Env } from './lib/auth';
 import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 
@@ -142,6 +142,17 @@ export default {
         console.log(`[Cron] Updated scores for ${recentPosts.length} posts`);
       } catch (error) {
         console.error('[Cron] Error updating scores:', error);
+      }
+    }
+
+    // Create weekly draft - runs Friday at 18:00 UTC
+    if (event.cron === '0 18 * * FRI') {
+      try {
+        console.log('[Cron] Creating weekly newsletter draft...');
+        const draft = await createWeeklyDraft(env);
+        console.log(`[Cron] Draft created/found: ${draft.id} - "${draft.subject}"`);
+      } catch (error) {
+        console.error('[Cron] Error creating newsletter draft:', error);
       }
     }
 

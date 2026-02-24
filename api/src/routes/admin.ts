@@ -4,7 +4,7 @@ import { eq, sql, desc, isNull, and, gte, lte, count, countDistinct } from 'driz
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
-import { sendWeeklyNewsletter } from '../lib/newsletter';
+import { sendWeeklyNewsletter, createWeeklyDraft, getWeeklySubject, getNextMondayAt18UTC, getNewsletterSubscribers } from '../lib/newsletter';
 import { generateSlug } from '../lib/utils';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
@@ -322,15 +322,165 @@ admin.put('/users/:id/remove-super-admin', requireSuperAdmin(), async (c) => {
   }
 });
 
-// Manually trigger the weekly newsletter (admin only)
+// GET /admin/newsletter/status - countdown, subscribers, current draft
+admin.get('/newsletter/status', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  try {
+    const subscribers = await getNewsletterSubscribers(db);
+    const nextSendAt = getNextMondayAt18UTC();
+    const secondsUntilNextSend = Math.max(0, Math.floor((nextSendAt.getTime() - Date.now()) / 1000));
+
+    // Find current draft/scheduled
+    const weekStart = new Date();
+    const day = weekStart.getUTCDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    weekStart.setUTCDate(weekStart.getUTCDate() + diff);
+    weekStart.setUTCHours(0, 0, 0, 0);
+
+    const [currentDraft] = await db
+      .select()
+      .from(schema.newsletterSends)
+      .where(
+        and(
+          sql`${schema.newsletterSends.status} IN ('draft', 'scheduled')`,
+          gte(schema.newsletterSends.createdAt, weekStart)
+        )
+      )
+      .limit(1);
+
+    return c.json({
+      activeSubscribers: subscribers.length,
+      nextSendAt: nextSendAt.toISOString(),
+      secondsUntilNextSend,
+      currentDraft: currentDraft ? {
+        id: currentDraft.id,
+        subject: currentDraft.subject,
+        status: currentDraft.status,
+        sentAt: currentDraft.sentAt ? new Date(currentDraft.sentAt).toISOString() : null,
+        recipientCount: currentDraft.recipientCount,
+        openedCount: 0,
+        openRate: 0,
+      } : null,
+    });
+  } catch (error) {
+    console.error('Error fetching newsletter status:', error);
+    return c.json({ error: 'Error al obtener estado del newsletter' }, 500);
+  }
+});
+
+// GET /admin/newsletter/sends - history with open rates
+admin.get('/newsletter/sends', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  try {
+    const sends = await db.all(sql`
+      SELECT
+        ns.id, ns.subject, ns.status, ns.sent_at as sentAt,
+        ns.recipient_count as recipientCount,
+        count(CASE WHEN no2.opened_at IS NOT NULL THEN 1 END) as openedCount
+      FROM newsletter_sends ns
+      LEFT JOIN newsletter_opens no2 ON no2.send_id = ns.id
+      GROUP BY ns.id
+      ORDER BY ns.sent_at DESC
+    `) as any[];
+
+    return c.json({
+      sends: sends.map((s: any) => ({
+        id: s.id,
+        subject: s.subject,
+        status: s.status,
+        sentAt: s.sentAt ? new Date(s.sentAt * 1000).toISOString() : null,
+        recipientCount: s.recipientCount,
+        openedCount: s.openedCount ?? 0,
+        openRate: s.recipientCount && s.recipientCount > 0
+          ? Math.round(((s.openedCount ?? 0) / s.recipientCount) * 100)
+          : 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching newsletter sends:', error);
+    return c.json({ error: 'Error al obtener historial de envios' }, 500);
+  }
+});
+
+// POST /admin/newsletter/draft - create or update weekly draft
+admin.post('/newsletter/draft', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  try {
+    const body = await c.req.json<{ subject: string }>();
+    if (!body.subject || !body.subject.trim()) {
+      return c.json({ error: 'Subject es requerido' }, 400);
+    }
+
+    const weekStart = new Date();
+    const day = weekStart.getUTCDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    weekStart.setUTCDate(weekStart.getUTCDate() + diff);
+    weekStart.setUTCHours(0, 0, 0, 0);
+
+    // Check for existing draft/scheduled this week
+    const [existing] = await db
+      .select()
+      .from(schema.newsletterSends)
+      .where(
+        and(
+          sql`${schema.newsletterSends.status} IN ('draft', 'scheduled')`,
+          gte(schema.newsletterSends.createdAt, weekStart)
+        )
+      )
+      .limit(1);
+
+    const now = new Date();
+
+    if (existing) {
+      await db
+        .update(schema.newsletterSends)
+        .set({ subject: body.subject.trim(), updatedAt: now })
+        .where(eq(schema.newsletterSends.id, existing.id));
+
+      return c.json({ ...existing, subject: body.subject.trim(), updatedAt: now.toISOString() });
+    }
+
+    const id = crypto.randomUUID();
+    const nextMonday = getNextMondayAt18UTC();
+
+    await db.insert(schema.newsletterSends).values({
+      id,
+      subject: body.subject.trim(),
+      status: 'draft',
+      scheduledFor: nextMonday,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const [created] = await db
+      .select()
+      .from(schema.newsletterSends)
+      .where(eq(schema.newsletterSends.id, id));
+
+    return c.json(created);
+  } catch (error) {
+    console.error('Error creating newsletter draft:', error);
+    return c.json({ error: 'Error al crear borrador' }, 500);
+  }
+});
+
+// POST /admin/newsletter/send - send newsletter (optionally with sendId)
 admin.post('/newsletter/send', async (c) => {
   try {
     console.log('[Admin] Manual newsletter trigger requested');
-    const result = await sendWeeklyNewsletter(c.env);
+    let sendId: string | undefined;
+    try {
+      const body = await c.req.json<{ sendId?: string }>();
+      sendId = body.sendId;
+    } catch {
+      // No body is fine
+    }
+    const result = await sendWeeklyNewsletter(c.env, sendId);
     return c.json({
       success: true,
       sent: result.sent,
       errors: result.errors,
+      sendId: result.sendId,
     });
   } catch (error) {
     console.error('Error sending newsletter:', error);

@@ -210,6 +210,24 @@ export const linkClicks = sqliteTable(
   ]
 );
 
+export const newsletterSends = sqliteTable(
+  'newsletter_sends',
+  {
+    id: text('id').primaryKey(),
+    subject: text('subject').notNull(),
+    status: text('status').notNull().default('draft'),
+    scheduledFor: integer('scheduled_for', { mode: 'timestamp' }),
+    sentAt: integer('sent_at', { mode: 'timestamp' }),
+    recipientCount: integer('recipient_count'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_newsletter_sends_status').on(table.status),
+    index('idx_newsletter_sends_scheduled_for').on(table.scheduledFor),
+  ]
+);
+
 export const newsletterOpens = sqliteTable(
   'newsletter_opens',
   {
@@ -218,14 +236,18 @@ export const newsletterOpens = sqliteTable(
     userId: text('user_id').notNull(),
     sendDate: integer('send_date', { mode: 'timestamp' }).notNull(),
     openedAt: integer('opened_at', { mode: 'timestamp' }),
+    sendId: text('send_id').references(() => newsletterSends.id, { onDelete: 'set null' }),
   },
   (table) => [
     uniqueIndex('idx_newsletter_opens_token').on(table.token),
     index('idx_newsletter_opens_send_date').on(table.sendDate),
     index('idx_newsletter_opens_user').on(table.userId),
+    index('idx_newsletter_opens_send_id').on(table.sendId),
   ]
 );
 
 export type PageView = typeof pageViews.$inferSelect;
 export type LinkClick = typeof linkClicks.$inferSelect;
 export type NewsletterOpen = typeof newsletterOpens.$inferSelect;
+export type NewsletterSend = typeof newsletterSends.$inferSelect;
+export type NewNewsletterSend = typeof newsletterSends.$inferInsert;
