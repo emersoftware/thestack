@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, sql, desc, isNull } from 'drizzle-orm';
+import { eq, sql, desc, isNull, and, gte, lte, count, countDistinct } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
@@ -388,6 +388,352 @@ admin.post('/migrate-slugs', async (c) => {
   } catch (error) {
     console.error('Error migrating slugs:', error);
     return c.json({ error: 'Error al migrar slugs' }, 500);
+  }
+});
+
+// ─── Analytics helpers ───
+
+function parseDateRange(c: { req: { query: (k: string) => string | undefined } }) {
+  const startStr = c.req.query('start');
+  const endStr = c.req.query('end');
+  const now = new Date();
+  const start = startStr ? new Date(startStr + 'T00:00:00Z') : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const end = endStr ? new Date(endStr + 'T23:59:59Z') : now;
+  return { start, end };
+}
+
+// GET /admin/analytics/overview
+admin.get('/analytics/overview', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const [views, visitors, clicks, opens] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(schema.pageViews)
+        .where(and(gte(schema.pageViews.createdAt, start), lte(schema.pageViews.createdAt, end))),
+      db.select({ count: sql<number>`count(distinct coalesce(user_id, user_agent))` }).from(schema.pageViews)
+        .where(and(gte(schema.pageViews.createdAt, start), lte(schema.pageViews.createdAt, end))),
+      db.select({ count: sql<number>`count(*)` }).from(schema.linkClicks)
+        .where(and(gte(schema.linkClicks.createdAt, start), lte(schema.linkClicks.createdAt, end))),
+      db.select({ count: sql<number>`count(*)` }).from(schema.newsletterOpens)
+        .where(and(gte(schema.newsletterOpens.sendDate, start), lte(schema.newsletterOpens.sendDate, end), sql`opened_at IS NOT NULL`)),
+    ]);
+    return c.json({
+      pageViews: views[0]?.count || 0,
+      uniqueVisitors: visitors[0]?.count || 0,
+      linkClicks: clicks[0]?.count || 0,
+      newsletterOpens: opens[0]?.count || 0,
+    });
+  } catch (error) {
+    console.error('Analytics overview error:', error);
+    return c.json({ error: 'Error al obtener analytics' }, 500);
+  }
+});
+
+// GET /admin/analytics/posts-per-day
+admin.get('/analytics/posts-per-day', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const rows = await db
+      .select({ day: sql<string>`date(created_at, 'unixepoch')`, count: sql<number>`count(*)` })
+      .from(schema.posts)
+      .where(and(gte(schema.posts.createdAt, start), lte(schema.posts.createdAt, end)))
+      .groupBy(sql`date(created_at, 'unixepoch')`)
+      .orderBy(sql`date(created_at, 'unixepoch')`);
+    return c.json({ data: rows });
+  } catch (error) {
+    console.error('Posts per day error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/registrations-per-day
+admin.get('/analytics/registrations-per-day', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const rows = await db
+      .select({ day: sql<string>`date(created_at, 'unixepoch')`, count: sql<number>`count(*)` })
+      .from(schema.users)
+      .where(and(gte(schema.users.createdAt, start), lte(schema.users.createdAt, end)))
+      .groupBy(sql`date(created_at, 'unixepoch')`)
+      .orderBy(sql`date(created_at, 'unixepoch')`);
+    return c.json({ data: rows });
+  } catch (error) {
+    console.error('Registrations per day error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/time-to-first-action
+admin.get('/analytics/time-to-first-action', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const [firstPost, firstComment, firstUpvote] = await Promise.all([
+      db.all(sql`
+        SELECT avg(first_action - registered) as avg_seconds FROM (
+          SELECT u.created_at as registered, min(p.created_at) as first_action
+          FROM users u JOIN posts p ON p.author_id = u.id
+          WHERE u.created_at >= ${Math.floor(start.getTime() / 1000)} AND u.created_at <= ${Math.floor(end.getTime() / 1000)}
+          GROUP BY u.id
+        ) WHERE first_action IS NOT NULL
+      `),
+      db.all(sql`
+        SELECT avg(first_action - registered) as avg_seconds FROM (
+          SELECT u.created_at as registered, min(c.created_at) as first_action
+          FROM users u JOIN comments c ON c.author_id = u.id
+          WHERE u.created_at >= ${Math.floor(start.getTime() / 1000)} AND u.created_at <= ${Math.floor(end.getTime() / 1000)}
+          GROUP BY u.id
+        ) WHERE first_action IS NOT NULL
+      `),
+      db.all(sql`
+        SELECT avg(first_action - registered) as avg_seconds FROM (
+          SELECT u.created_at as registered, min(pu.created_at) as first_action
+          FROM users u JOIN post_upvotes pu ON pu.user_id = u.id
+          WHERE u.created_at >= ${Math.floor(start.getTime() / 1000)} AND u.created_at <= ${Math.floor(end.getTime() / 1000)}
+          GROUP BY u.id
+        ) WHERE first_action IS NOT NULL
+      `),
+    ]);
+    return c.json({
+      avgSecondsToFirstPost: (firstPost[0] as any)?.avg_seconds || null,
+      avgSecondsToFirstComment: (firstComment[0] as any)?.avg_seconds || null,
+      avgSecondsToFirstUpvote: (firstUpvote[0] as any)?.avg_seconds || null,
+    });
+  } catch (error) {
+    console.error('Time to first action error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/engagement
+admin.get('/analytics/engagement', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)));
+  try {
+    const [commentsCount, upvotesCount, postsCount] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(schema.comments)
+        .where(and(gte(schema.comments.createdAt, start), lte(schema.comments.createdAt, end))),
+      db.select({ count: sql<number>`count(*)` }).from(schema.postUpvotes)
+        .where(and(gte(schema.postUpvotes.createdAt, start), lte(schema.postUpvotes.createdAt, end))),
+      db.select({ count: sql<number>`count(*)` }).from(schema.posts)
+        .where(and(gte(schema.posts.createdAt, start), lte(schema.posts.createdAt, end))),
+    ]);
+    const comments = commentsCount[0]?.count || 0;
+    const upvotes = upvotesCount[0]?.count || 0;
+    const postsCt = postsCount[0]?.count || 0;
+    return c.json({
+      commentsPerDay: +(comments / days).toFixed(1),
+      upvotesPerDay: +(upvotes / days).toFixed(1),
+      postsPerDay: +(postsCt / days).toFixed(1),
+      commentsPerPost: postsCt > 0 ? +(comments / postsCt).toFixed(1) : 0,
+      upvotesPerPost: postsCt > 0 ? +(upvotes / postsCt).toFixed(1) : 0,
+    });
+  } catch (error) {
+    console.error('Engagement error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/retention
+admin.get('/analytics/retention', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    // DAU: distinct users with any activity per day (posts, comments, upvotes)
+    const dauRows = await db.all(sql`
+      SELECT day, count(distinct user_id) as active_users FROM (
+        SELECT date(created_at, 'unixepoch') as day, author_id as user_id FROM posts
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+        UNION ALL
+        SELECT date(created_at, 'unixepoch') as day, author_id as user_id FROM comments
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+        UNION ALL
+        SELECT date(created_at, 'unixepoch') as day, user_id FROM post_upvotes
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+      ) GROUP BY day ORDER BY day
+    `);
+    // WAU: distinct users per ISO week
+    const wauRows = await db.all(sql`
+      SELECT week, count(distinct user_id) as active_users FROM (
+        SELECT strftime('%Y-W%W', created_at, 'unixepoch') as week, author_id as user_id FROM posts
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+        UNION ALL
+        SELECT strftime('%Y-W%W', created_at, 'unixepoch') as week, author_id as user_id FROM comments
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+        UNION ALL
+        SELECT strftime('%Y-W%W', created_at, 'unixepoch') as week, user_id FROM post_upvotes
+        WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+      ) GROUP BY week ORDER BY week
+    `);
+    return c.json({ dau: dauRows, wau: wauRows });
+  } catch (error) {
+    console.error('Retention error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/newsletter
+admin.get('/analytics/newsletter', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const [subscriberCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.users)
+      .where(and(eq(schema.users.emailVerified, true), eq(schema.users.newsletterEnabled, true), eq(schema.users.isBanned, false)));
+
+    const sendRows = await db.all(sql`
+      SELECT date(send_date, 'unixepoch') as send_day,
+        count(*) as total,
+        count(opened_at) as opened
+      FROM newsletter_opens
+      WHERE send_date >= ${Math.floor(start.getTime() / 1000)} AND send_date <= ${Math.floor(end.getTime() / 1000)}
+      GROUP BY date(send_date, 'unixepoch')
+      ORDER BY date(send_date, 'unixepoch')
+    `);
+
+    return c.json({
+      activeSubscribers: subscriberCount.count,
+      sends: sendRows,
+    });
+  } catch (error) {
+    console.error('Newsletter analytics error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/content
+admin.get('/analytics/content', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const topPosts = await db
+      .select({
+        id: schema.posts.id,
+        title: schema.posts.title,
+        domain: schema.posts.domain,
+        upvotesCount: schema.posts.upvotesCount,
+        authorUsername: schema.users.username,
+      })
+      .from(schema.posts)
+      .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
+      .where(and(gte(schema.posts.createdAt, start), lte(schema.posts.createdAt, end), eq(schema.posts.isDeleted, false)))
+      .orderBy(desc(schema.posts.upvotesCount))
+      .limit(10);
+
+    const topUsers = await db.all(sql`
+      SELECT u.username, count(p.id) as post_count, coalesce(sum(p.upvotes_count), 0) as total_upvotes
+      FROM users u JOIN posts p ON p.author_id = u.id
+      WHERE p.created_at >= ${Math.floor(start.getTime() / 1000)} AND p.created_at <= ${Math.floor(end.getTime() / 1000)} AND p.is_deleted = 0
+      GROUP BY u.id ORDER BY total_upvotes DESC LIMIT 10
+    `);
+
+    const topDomains = await db.all(sql`
+      SELECT domain, count(*) as post_count, coalesce(sum(upvotes_count), 0) as total_upvotes
+      FROM posts
+      WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)} AND is_deleted = 0
+      GROUP BY domain ORDER BY post_count DESC LIMIT 10
+    `);
+
+    return c.json({ topPosts, topUsers, topDomains });
+  } catch (error) {
+    console.error('Content analytics error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/activation-funnel
+admin.get('/analytics/activation-funnel', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const [totalUsers] = await db.select({ count: sql<number>`count(*)` }).from(schema.users)
+      .where(and(gte(schema.users.createdAt, start), lte(schema.users.createdAt, end)));
+    const [posters] = await db.all(sql`
+      SELECT count(distinct author_id) as count FROM posts WHERE author_id IN (
+        SELECT id FROM users WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+      )
+    `) as any[];
+    const [commenters] = await db.all(sql`
+      SELECT count(distinct author_id) as count FROM comments WHERE author_id IN (
+        SELECT id FROM users WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+      )
+    `) as any[];
+    const [upvoters] = await db.all(sql`
+      SELECT count(distinct user_id) as count FROM post_upvotes WHERE user_id IN (
+        SELECT id FROM users WHERE created_at >= ${Math.floor(start.getTime() / 1000)} AND created_at <= ${Math.floor(end.getTime() / 1000)}
+      )
+    `) as any[];
+
+    const total = totalUsers.count || 0;
+    return c.json({
+      totalUsers: total,
+      posted: posters?.count || 0,
+      commented: commenters?.count || 0,
+      upvoted: upvoters?.count || 0,
+      postedPct: total > 0 ? +((posters?.count || 0) / total * 100).toFixed(1) : 0,
+      commentedPct: total > 0 ? +((commenters?.count || 0) / total * 100).toFixed(1) : 0,
+      upvotedPct: total > 0 ? +((upvoters?.count || 0) / total * 100).toFixed(1) : 0,
+    });
+  } catch (error) {
+    console.error('Activation funnel error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/page-views
+admin.get('/analytics/page-views', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const perDay = await db
+      .select({ day: sql<string>`date(created_at, 'unixepoch')`, count: sql<number>`count(*)` })
+      .from(schema.pageViews)
+      .where(and(gte(schema.pageViews.createdAt, start), lte(schema.pageViews.createdAt, end)))
+      .groupBy(sql`date(created_at, 'unixepoch')`)
+      .orderBy(sql`date(created_at, 'unixepoch')`);
+
+    const topPaths = await db
+      .select({ path: schema.pageViews.path, count: sql<number>`count(*)` })
+      .from(schema.pageViews)
+      .where(and(gte(schema.pageViews.createdAt, start), lte(schema.pageViews.createdAt, end)))
+      .groupBy(schema.pageViews.path)
+      .orderBy(sql`count(*) desc`)
+      .limit(10);
+
+    return c.json({ perDay, topPaths });
+  } catch (error) {
+    console.error('Page views analytics error:', error);
+    return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// GET /admin/analytics/link-clicks
+admin.get('/analytics/link-clicks', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const { start, end } = parseDateRange(c);
+  try {
+    const perDay = await db
+      .select({ day: sql<string>`date(created_at, 'unixepoch')`, count: sql<number>`count(*)` })
+      .from(schema.linkClicks)
+      .where(and(gte(schema.linkClicks.createdAt, start), lte(schema.linkClicks.createdAt, end)))
+      .groupBy(sql`date(created_at, 'unixepoch')`)
+      .orderBy(sql`date(created_at, 'unixepoch')`);
+
+    const topPosts = await db.all(sql`
+      SELECT lc.post_id, p.title, count(*) as click_count
+      FROM link_clicks lc LEFT JOIN posts p ON p.id = lc.post_id
+      WHERE lc.created_at >= ${Math.floor(start.getTime() / 1000)} AND lc.created_at <= ${Math.floor(end.getTime() / 1000)}
+      GROUP BY lc.post_id ORDER BY click_count DESC LIMIT 10
+    `);
+
+    return c.json({ perDay, topPosts });
+  } catch (error) {
+    console.error('Link clicks analytics error:', error);
+    return c.json({ error: 'Error' }, 500);
   }
 });
 

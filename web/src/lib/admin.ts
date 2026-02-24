@@ -72,3 +72,79 @@ export interface NewsletterResult {
 export async function sendNewsletter(): Promise<NewsletterResult> {
   return apiFetch('/api/admin/newsletter/send', { method: 'POST' });
 }
+
+// ─── Analytics ───
+
+function dateParams(start: string, end: string): string {
+  return `?start=${start}&end=${end}`;
+}
+
+export interface AnalyticsOverview {
+  pageViews: number;
+  uniqueVisitors: number;
+  linkClicks: number;
+  newsletterOpens: number;
+}
+
+export interface DayCount { day: string; count: number }
+export interface PathCount { path: string; count: number }
+
+export async function getAnalyticsOverview(start: string, end: string): Promise<AnalyticsOverview> {
+  return apiFetch(`/api/admin/analytics/overview${dateParams(start, end)}`);
+}
+
+export async function getPostsPerDay(start: string, end: string): Promise<{ data: DayCount[] }> {
+  return apiFetch(`/api/admin/analytics/posts-per-day${dateParams(start, end)}`);
+}
+
+export async function getRegistrationsPerDay(start: string, end: string): Promise<{ data: DayCount[] }> {
+  return apiFetch(`/api/admin/analytics/registrations-per-day${dateParams(start, end)}`);
+}
+
+export async function getEngagement(start: string, end: string): Promise<{
+  commentsPerDay: number; upvotesPerDay: number; postsPerDay: number;
+  commentsPerPost: number; upvotesPerPost: number;
+}> {
+  return apiFetch(`/api/admin/analytics/engagement${dateParams(start, end)}`);
+}
+
+export async function getRetention(start: string, end: string): Promise<{
+  dau: { day: string; active_users: number }[];
+  wau: { week: string; active_users: number }[];
+}> {
+  return apiFetch(`/api/admin/analytics/retention${dateParams(start, end)}`);
+}
+
+export async function getNewsletterAnalytics(start: string, end: string): Promise<{
+  activeSubscribers: number;
+  sends: { send_day: string; total: number; opened: number }[];
+}> {
+  return apiFetch(`/api/admin/analytics/newsletter${dateParams(start, end)}`);
+}
+
+export async function getContentAnalytics(start: string, end: string): Promise<{
+  topPosts: { id: string; title: string; domain: string; upvotesCount: number; authorUsername: string }[];
+  topUsers: { username: string; post_count: number; total_upvotes: number }[];
+  topDomains: { domain: string; post_count: number; total_upvotes: number }[];
+}> {
+  return apiFetch(`/api/admin/analytics/content${dateParams(start, end)}`);
+}
+
+export async function getActivationFunnel(start: string, end: string): Promise<{
+  totalUsers: number; posted: number; commented: number; upvoted: number;
+  postedPct: number; commentedPct: number; upvotedPct: number;
+}> {
+  return apiFetch(`/api/admin/analytics/activation-funnel${dateParams(start, end)}`);
+}
+
+export async function getPageViewsAnalytics(start: string, end: string): Promise<{
+  perDay: DayCount[]; topPaths: PathCount[];
+}> {
+  return apiFetch(`/api/admin/analytics/page-views${dateParams(start, end)}`);
+}
+
+export async function getLinkClicksAnalytics(start: string, end: string): Promise<{
+  perDay: DayCount[]; topPosts: { post_id: string; title: string; click_count: number }[];
+}> {
+  return apiFetch(`/api/admin/analytics/link-clicks${dateParams(start, end)}`);
+}

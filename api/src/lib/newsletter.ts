@@ -12,6 +12,7 @@ interface NewsletterPost {
 }
 
 interface NewsletterSubscriber {
+  id: string;
   email: string;
   name: string;
 }
@@ -76,6 +77,7 @@ export async function getNewsletterSubscribers(
 ): Promise<NewsletterSubscriber[]> {
   const subscribers = await db
     .select({
+      id: schema.users.id,
       email: schema.users.email,
       name: schema.users.name,
     })
@@ -94,7 +96,7 @@ export async function getNewsletterSubscribers(
 /**
  * Generate the HTML content for the newsletter email
  */
-export function generateNewsletterHTML(posts: NewsletterPost[], frontendUrl: string): string {
+export function generateNewsletterHTML(posts: NewsletterPost[], frontendUrl: string, trackingPixelUrl?: string): string {
   const postCards = posts
     .map(
       (post) => `
@@ -206,7 +208,7 @@ export function generateNewsletterHTML(posts: NewsletterPost[], frontendUrl: str
             </table>
           </td>
         </tr>
-      </table>
+      </table>${trackingPixelUrl ? `\n      <img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none">` : ''}
     </body>
     </html>
   `;
@@ -270,11 +272,29 @@ export async function sendWeeklyNewsletter(
       `[Newsletter] Sending to ${subscribers.length} subscribers with ${posts.length} posts`
     );
 
-    // Generate email HTML and subject
-    const emailHtml = generateNewsletterHTML(posts, env.FRONTEND_URL);
     const subject = getWeeklySubject();
+    const sendDate = new Date();
+    const apiBaseUrl = env.FRONTEND_URL.replace('thestack.cl', 'api.thestack.cl').replace('localhost:5173', 'localhost:8787');
 
     console.log(`[Newsletter] Using subject: "${subject}"`);
+
+    // Generate tracking tokens and insert newsletter_opens rows
+    const subscriberTokens = new Map<string, string>();
+    for (const subscriber of subscribers) {
+      const token = crypto.randomUUID();
+      subscriberTokens.set(subscriber.id, token);
+      try {
+        await db.insert(schema.newsletterOpens).values({
+          id: crypto.randomUUID(),
+          token,
+          userId: subscriber.id,
+          sendDate,
+          openedAt: null,
+        });
+      } catch {
+        // Continue even if insert fails
+      }
+    }
 
     // Split subscribers into chunks of 100 for batch sending
     const BATCH_SIZE = 100;
@@ -284,12 +304,17 @@ export async function sendWeeklyNewsletter(
       const chunk = chunks[i];
 
       try {
-        const batchEmails = chunk.map((subscriber) => ({
-          from: 'the stack <hola@thestack.cl>',
-          to: [subscriber.email],
-          subject,
-          html: emailHtml,
-        }));
+        const batchEmails = chunk.map((subscriber) => {
+          const token = subscriberTokens.get(subscriber.id);
+          const trackingUrl = token ? `https://api.thestack.cl/api/track/open?token=${token}` : undefined;
+          const html = generateNewsletterHTML(posts, env.FRONTEND_URL, trackingUrl);
+          return {
+            from: 'the stack <hola@thestack.cl>',
+            to: [subscriber.email],
+            subject,
+            html,
+          };
+        });
 
         const result = await resend.batch.send(batchEmails);
         console.log('[Newsletter] Resend response:', JSON.stringify(result, null, 2));

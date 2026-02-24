@@ -12,16 +12,27 @@
     deletePost,
     restorePost,
     sendNewsletter,
+    getAnalyticsOverview,
+    getPostsPerDay,
+    getRegistrationsPerDay,
+    getEngagement,
+    getRetention,
+    getNewsletterAnalytics,
+    getContentAnalytics,
+    getActivationFunnel,
+    getPageViewsAnalytics,
+    getLinkClicksAnalytics,
     type AdminStats,
     type AdminUser,
     type AdminPost,
+    type AnalyticsOverview,
+    type DayCount,
   } from '$lib/admin';
 
-  // User is guaranteed to be admin by server-side load (redirects if not)
   let { data } = $props();
   const user = data.user!;
 
-  let activeTab = $state<'stats' | 'users' | 'posts' | 'newsletter'>('stats');
+  let activeTab = $state<'analytics' | 'users' | 'posts' | 'newsletter'>('analytics');
   let stats = $state<AdminStats | null>(null);
   let users = $state<AdminUser[]>([]);
   let posts = $state<AdminPost[]>([]);
@@ -32,6 +43,23 @@
   let showNewsletterModal = $state(false);
   let newsletterSending = $state(false);
   let newsletterResult = $state<{ sent: number; errors: number } | null>(null);
+
+  // Analytics state
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  let startDate = $state(thirtyDaysAgo.toISOString().split('T')[0]);
+  let endDate = $state(now.toISOString().split('T')[0]);
+  let analyticsLoading = $state(false);
+  let overview = $state<AnalyticsOverview | null>(null);
+  let postsPerDay = $state<DayCount[]>([]);
+  let registrationsPerDay = $state<DayCount[]>([]);
+  let engagement = $state<any>(null);
+  let retention = $state<any>(null);
+  let newsletterStats = $state<any>(null);
+  let content = $state<any>(null);
+  let funnel = $state<any>(null);
+  let pageViewsData = $state<any>(null);
+  let linkClicksData = $state<any>(null);
 
   async function loadData() {
     loading = true;
@@ -55,35 +83,56 @@
     }
   }
 
-  async function handlePromote(id: string) {
-    await promoteUser(id);
-    users = users.map((u) => (u.id === id ? { ...u, isAdmin: true } : u));
+  async function loadAnalytics() {
+    analyticsLoading = true;
+    try {
+      const [ov, ppd, rpd, eng, ret, nl, cont, fun, pv, lc] = await Promise.all([
+        getAnalyticsOverview(startDate, endDate),
+        getPostsPerDay(startDate, endDate),
+        getRegistrationsPerDay(startDate, endDate),
+        getEngagement(startDate, endDate),
+        getRetention(startDate, endDate),
+        getNewsletterAnalytics(startDate, endDate),
+        getContentAnalytics(startDate, endDate),
+        getActivationFunnel(startDate, endDate),
+        getPageViewsAnalytics(startDate, endDate),
+        getLinkClicksAnalytics(startDate, endDate),
+      ]);
+      overview = ov;
+      postsPerDay = ppd.data;
+      registrationsPerDay = rpd.data;
+      engagement = eng;
+      retention = ret;
+      newsletterStats = nl;
+      content = cont;
+      funnel = fun;
+      pageViewsData = pv;
+      linkClicksData = lc;
+    } catch (err) {
+      console.error('Error loading analytics:', err);
+    } finally {
+      analyticsLoading = false;
+    }
   }
 
-  async function handleDemote(id: string) {
-    await demoteUser(id);
-    users = users.map((u) => (u.id === id ? { ...u, isAdmin: false } : u));
+  function maxCount(data: { count: number }[]): number {
+    return Math.max(1, ...data.map((d) => d.count));
   }
 
-  async function handleBan(id: string) {
-    await banUser(id);
-    users = users.map((u) => (u.id === id ? { ...u, isBanned: true } : u));
+  function formatSeconds(seconds: number | null): string {
+    if (!seconds) return '-';
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+    return `${Math.round(seconds / 86400)}d`;
   }
 
-  async function handleUnban(id: string) {
-    await unbanUser(id);
-    users = users.map((u) => (u.id === id ? { ...u, isBanned: false } : u));
-  }
-
-  async function handleDelete(id: string) {
-    await deletePost(id);
-    posts = posts.map((p) => (p.id === id ? { ...p, isDeleted: true } : p));
-  }
-
-  async function handleRestore(id: string) {
-    await restorePost(id);
-    posts = posts.map((p) => (p.id === id ? { ...p, isDeleted: false } : p));
-  }
+  async function handlePromote(id: string) { await promoteUser(id); users = users.map((u) => (u.id === id ? { ...u, isAdmin: true } : u)); }
+  async function handleDemote(id: string) { await demoteUser(id); users = users.map((u) => (u.id === id ? { ...u, isAdmin: false } : u)); }
+  async function handleBan(id: string) { await banUser(id); users = users.map((u) => (u.id === id ? { ...u, isBanned: true } : u)); }
+  async function handleUnban(id: string) { await unbanUser(id); users = users.map((u) => (u.id === id ? { ...u, isBanned: false } : u)); }
+  async function handleDelete(id: string) { await deletePost(id); posts = posts.map((p) => (p.id === id ? { ...p, isDeleted: true } : p)); }
+  async function handleRestore(id: string) { await restorePost(id); posts = posts.map((p) => (p.id === id ? { ...p, isDeleted: false } : p)); }
 
   async function handleSendNewsletter() {
     newsletterSending = true;
@@ -100,6 +149,7 @@
 
   onMount(() => {
     loadData();
+    loadAnalytics();
   });
 </script>
 
@@ -112,15 +162,15 @@
 
   <!-- Tabs -->
   <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border overflow-x-auto">
-    {#each ['stats', 'users', 'posts', 'newsletter'] as tab}
+    {#each ['analytics', 'users', 'posts', 'newsletter'] as tab}
       <button
-        onclick={() => (activeTab = tab as 'stats' | 'users' | 'posts' | 'newsletter')}
+        onclick={() => (activeTab = tab as typeof activeTab)}
         class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
           {activeTab === tab
           ? 'text-foreground border-b-2 border-accent'
           : 'text-muted-foreground hover:text-foreground'}"
       >
-        {tab === 'stats' ? 'Estadisticas' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : 'Newsletter'}
+        {tab === 'analytics' ? 'Analytics' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : 'Newsletter'}
       </button>
     {/each}
   </div>
@@ -132,22 +182,294 @@
       {error}
     </div>
   {:else}
-    <!-- Stats Tab -->
-    {#if activeTab === 'stats' && stats}
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.users}</p>
-          <p class="text-xs sm:text-sm text-muted-foreground">Usuarios</p>
-        </div>
-        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.posts}</p>
-          <p class="text-xs sm:text-sm text-muted-foreground">Posts</p>
-        </div>
-        <div class="bg-card border border-border rounded-xl p-4 sm:p-6 text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-foreground">{stats.upvotes}</p>
-          <p class="text-xs sm:text-sm text-muted-foreground">Upvotes</p>
-        </div>
+    <!-- Analytics Tab -->
+    {#if activeTab === 'analytics'}
+      <!-- Date range picker -->
+      <div class="flex flex-wrap items-center gap-3 mb-6">
+        <label class="text-sm text-muted-foreground">Desde</label>
+        <input type="date" bind:value={startDate} class="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground" />
+        <label class="text-sm text-muted-foreground">Hasta</label>
+        <input type="date" bind:value={endDate} class="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground" />
+        <button
+          onclick={loadAnalytics}
+          class="px-4 py-1.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+        >
+          Aplicar
+        </button>
       </div>
+
+      {#if analyticsLoading}
+        <p class="text-muted-foreground text-center py-8">Cargando analytics...</p>
+      {:else if overview}
+        <!-- Summary cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div class="bg-card border border-border rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-foreground">{overview.pageViews.toLocaleString()}</p>
+            <p class="text-xs text-muted-foreground">Page Views</p>
+          </div>
+          <div class="bg-card border border-border rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-foreground">{overview.uniqueVisitors.toLocaleString()}</p>
+            <p class="text-xs text-muted-foreground">Visitantes</p>
+          </div>
+          <div class="bg-card border border-border rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-foreground">{overview.linkClicks.toLocaleString()}</p>
+            <p class="text-xs text-muted-foreground">Link Clicks</p>
+          </div>
+          <div class="bg-card border border-border rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-foreground">{overview.newsletterOpens.toLocaleString()}</p>
+            <p class="text-xs text-muted-foreground">Newsletter Opens</p>
+          </div>
+        </div>
+
+        <!-- Engagement -->
+        {#if engagement}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Engagement (promedio/dia)</h3>
+            <div class="grid grid-cols-3 sm:grid-cols-5 gap-3 text-center">
+              <div><p class="text-lg font-bold text-foreground">{engagement.postsPerDay}</p><p class="text-xs text-muted-foreground">Posts</p></div>
+              <div><p class="text-lg font-bold text-foreground">{engagement.commentsPerDay}</p><p class="text-xs text-muted-foreground">Comentarios</p></div>
+              <div><p class="text-lg font-bold text-foreground">{engagement.upvotesPerDay}</p><p class="text-xs text-muted-foreground">Upvotes</p></div>
+              <div><p class="text-lg font-bold text-foreground">{engagement.commentsPerPost}</p><p class="text-xs text-muted-foreground">Comentarios/Post</p></div>
+              <div><p class="text-lg font-bold text-foreground">{engagement.upvotesPerPost}</p><p class="text-xs text-muted-foreground">Upvotes/Post</p></div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Activation Funnel -->
+        {#if funnel && funnel.totalUsers > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Funnel de activacion (usuarios registrados en el periodo)</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-muted-foreground w-24 shrink-0">Registrados</span>
+                <div class="flex-1 bg-muted rounded-full h-5">
+                  <div class="bg-accent h-5 rounded-full" style="width: 100%"></div>
+                </div>
+                <span class="text-xs font-medium text-foreground w-20 text-right">{funnel.totalUsers} (100%)</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-muted-foreground w-24 shrink-0">Upvotearon</span>
+                <div class="flex-1 bg-muted rounded-full h-5">
+                  <div class="bg-accent h-5 rounded-full" style="width: {funnel.upvotedPct}%"></div>
+                </div>
+                <span class="text-xs font-medium text-foreground w-20 text-right">{funnel.upvoted} ({funnel.upvotedPct}%)</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-muted-foreground w-24 shrink-0">Comentaron</span>
+                <div class="flex-1 bg-muted rounded-full h-5">
+                  <div class="bg-accent h-5 rounded-full" style="width: {funnel.commentedPct}%"></div>
+                </div>
+                <span class="text-xs font-medium text-foreground w-20 text-right">{funnel.commented} ({funnel.commentedPct}%)</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-muted-foreground w-24 shrink-0">Postearon</span>
+                <div class="flex-1 bg-muted rounded-full h-5">
+                  <div class="bg-accent h-5 rounded-full" style="width: {funnel.postedPct}%"></div>
+                </div>
+                <span class="text-xs font-medium text-foreground w-20 text-right">{funnel.posted} ({funnel.postedPct}%)</span>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Page Views per Day -->
+        {#if pageViewsData && pageViewsData.perDay.length > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Page Views por dia</h3>
+            <div class="flex items-end gap-px h-24">
+              {#each pageViewsData.perDay as d}
+                <div
+                  class="flex-1 bg-accent rounded-t-sm min-w-[3px]"
+                  style="height: {(d.count / maxCount(pageViewsData.perDay)) * 100}%"
+                  title="{d.day}: {d.count}"
+                ></div>
+              {/each}
+            </div>
+            <div class="flex justify-between mt-1">
+              <span class="text-[10px] text-muted-foreground">{pageViewsData.perDay[0]?.day}</span>
+              <span class="text-[10px] text-muted-foreground">{pageViewsData.perDay[pageViewsData.perDay.length - 1]?.day}</span>
+            </div>
+          </div>
+
+          <!-- Top Paths -->
+          {#if pageViewsData.topPaths.length > 0}
+            <div class="bg-card border border-border rounded-xl p-4 mb-6">
+              <h3 class="text-sm font-semibold text-foreground mb-3">Top Paginas</h3>
+              <table class="w-full text-xs">
+                <tbody>
+                  {#each pageViewsData.topPaths as p}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground font-mono">{p.path}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{p.count}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        {/if}
+
+        <!-- Link Clicks per Day -->
+        {#if linkClicksData && linkClicksData.perDay.length > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Link Clicks por dia</h3>
+            <div class="flex items-end gap-px h-24">
+              {#each linkClicksData.perDay as d}
+                <div
+                  class="flex-1 bg-accent rounded-t-sm min-w-[3px]"
+                  style="height: {(d.count / maxCount(linkClicksData.perDay)) * 100}%"
+                  title="{d.day}: {d.count}"
+                ></div>
+              {/each}
+            </div>
+          </div>
+
+          {#if linkClicksData.topPosts.length > 0}
+            <div class="bg-card border border-border rounded-xl p-4 mb-6">
+              <h3 class="text-sm font-semibold text-foreground mb-3">Posts mas clickeados</h3>
+              <table class="w-full text-xs">
+                <tbody>
+                  {#each linkClicksData.topPosts as p}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground truncate max-w-[300px]">{p.title || p.post_id}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{p.click_count}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        {/if}
+
+        <!-- Posts per Day -->
+        {#if postsPerDay.length > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Posts por dia</h3>
+            <div class="flex items-end gap-px h-24">
+              {#each postsPerDay as d}
+                <div
+                  class="flex-1 bg-accent rounded-t-sm min-w-[3px]"
+                  style="height: {(d.count / maxCount(postsPerDay)) * 100}%"
+                  title="{d.day}: {d.count}"
+                ></div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Registrations per Day -->
+        {#if registrationsPerDay.length > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Registros por dia</h3>
+            <div class="flex items-end gap-px h-24">
+              {#each registrationsPerDay as d}
+                <div
+                  class="flex-1 bg-accent rounded-t-sm min-w-[3px]"
+                  style="height: {(d.count / maxCount(registrationsPerDay)) * 100}%"
+                  title="{d.day}: {d.count}"
+                ></div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- DAU chart -->
+        {#if retention && retention.dau.length > 0}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">DAU (usuarios activos por dia)</h3>
+            <div class="flex items-end gap-px h-24">
+              {#each retention.dau as d}
+                {@const max = Math.max(1, ...retention.dau.map((x: any) => x.active_users))}
+                <div
+                  class="flex-1 bg-accent rounded-t-sm min-w-[3px]"
+                  style="height: {(d.active_users / max) * 100}%"
+                  title="{d.day}: {d.active_users}"
+                ></div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Newsletter stats -->
+        {#if newsletterStats}
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Newsletter</h3>
+            <p class="text-sm text-muted-foreground mb-3">Subscribers activos: <span class="font-bold text-foreground">{newsletterStats.activeSubscribers}</span></p>
+            {#if newsletterStats.sends.length > 0}
+              <table class="w-full text-xs">
+                <thead><tr>
+                  <th class="text-left py-1 text-foreground">Fecha</th>
+                  <th class="text-right py-1 text-foreground">Enviados</th>
+                  <th class="text-right py-1 text-foreground">Abiertos</th>
+                  <th class="text-right py-1 text-foreground">Open Rate</th>
+                </tr></thead>
+                <tbody>
+                  {#each newsletterStats.sends as s}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground">{s.send_day}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{s.total}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{s.opened}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{s.total > 0 ? Math.round(s.opened / s.total * 100) : 0}%</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {:else}
+              <p class="text-xs text-muted-foreground">Sin envios en este periodo</p>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- Top Content -->
+        {#if content}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <!-- Top Posts -->
+            <div class="bg-card border border-border rounded-xl p-4">
+              <h3 class="text-sm font-semibold text-foreground mb-3">Top Posts</h3>
+              <table class="w-full text-xs">
+                <tbody>
+                  {#each content.topPosts as p}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground truncate max-w-[200px]">{p.title}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{p.upvotesCount}▲</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Top Users -->
+            <div class="bg-card border border-border rounded-xl p-4">
+              <h3 class="text-sm font-semibold text-foreground mb-3">Top Usuarios</h3>
+              <table class="w-full text-xs">
+                <tbody>
+                  {#each content.topUsers as u}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground">{u.username}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{u.post_count} posts, {u.total_upvotes}▲</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Top Domains -->
+          <div class="bg-card border border-border rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Top Dominios</h3>
+            <table class="w-full text-xs">
+              <tbody>
+                {#each content.topDomains as d}
+                  <tr class="border-b border-border last:border-0">
+                    <td class="py-1.5 text-foreground">{d.domain}</td>
+                    <td class="py-1.5 text-right text-muted-foreground">{d.post_count} posts, {d.total_upvotes}▲</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      {/if}
     {/if}
 
     <!-- Users Tab -->
@@ -275,7 +597,6 @@
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div class="bg-card border border-border rounded-xl p-6 max-w-md w-full">
       {#if newsletterResult}
-        <!-- Result state -->
         <div class="text-center">
           {#if newsletterResult.errors === -1}
             <div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
@@ -308,7 +629,6 @@
           </button>
         </div>
       {:else if newsletterSending}
-        <!-- Sending state -->
         <div class="text-center">
           <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span class="text-muted-foreground">...</span>
@@ -317,7 +637,6 @@
           <p class="text-sm text-muted-foreground">Esto puede tomar unos segundos.</p>
         </div>
       {:else}
-        <!-- Confirmation state -->
         <h3 class="text-lg font-semibold text-foreground mb-2">Confirmar envio</h3>
         <p class="text-sm text-muted-foreground mb-6">
           Estas seguro de que quieres enviar el newsletter ahora? Se enviara a todos los usuarios suscritos con email verificado.

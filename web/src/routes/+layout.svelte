@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { PUBLIC_API_URL } from '$env/static/public';
   import '../app.css';
   import Header from '$lib/components/Header.svelte';
@@ -7,6 +8,18 @@
   import KeyboardNav from '$lib/components/KeyboardNav.svelte';
 
   let { children, data } = $props();
+
+  afterNavigate(() => {
+    try {
+      navigator.sendBeacon(
+        `${PUBLIC_API_URL}/api/track/pageview`,
+        new Blob(
+          [JSON.stringify({ path: window.location.pathname, referrer: document.referrer || undefined })],
+          { type: 'application/json' }
+        )
+      );
+    } catch {}
+  });
 
   /**
    * TEMPORARY: Clear legacy cookies from api.thestack.cl on first visit

@@ -177,3 +177,55 @@ export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
 export type CommentUpvote = typeof commentUpvotes.$inferSelect;
 export type NewCommentUpvote = typeof commentUpvotes.$inferInsert;
+
+export const pageViews = sqliteTable(
+  'page_views',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id'),
+    path: text('path').notNull(),
+    referrer: text('referrer'),
+    userAgent: text('user_agent'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_page_views_created_at').on(table.createdAt),
+    index('idx_page_views_path').on(table.path),
+    index('idx_page_views_user').on(table.userId),
+  ]
+);
+
+export const linkClicks = sqliteTable(
+  'link_clicks',
+  {
+    id: text('id').primaryKey(),
+    postId: text('post_id').notNull(),
+    userId: text('user_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_link_clicks_created_at').on(table.createdAt),
+    index('idx_link_clicks_post').on(table.postId),
+    index('idx_link_clicks_user').on(table.userId),
+  ]
+);
+
+export const newsletterOpens = sqliteTable(
+  'newsletter_opens',
+  {
+    id: text('id').primaryKey(),
+    token: text('token').notNull().unique(),
+    userId: text('user_id').notNull(),
+    sendDate: integer('send_date', { mode: 'timestamp' }).notNull(),
+    openedAt: integer('opened_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    uniqueIndex('idx_newsletter_opens_token').on(table.token),
+    index('idx_newsletter_opens_send_date').on(table.sendDate),
+    index('idx_newsletter_opens_user').on(table.userId),
+  ]
+);
+
+export type PageView = typeof pageViews.$inferSelect;
+export type LinkClick = typeof linkClicks.$inferSelect;
+export type NewsletterOpen = typeof newsletterOpens.$inferSelect;

@@ -7,8 +7,18 @@
   import { logoStore } from '$lib/stores/logo';
   import { toast } from '$lib/toast';
   import { ApiError } from '$lib/api';
+  import { PUBLIC_API_URL } from '$env/static/public';
 
   let { post, hasUpvoted = false }: { post: Post; hasUpvoted?: boolean } = $props();
+
+  function trackClick() {
+    try {
+      navigator.sendBeacon(
+        `${PUBLIC_API_URL}/api/track/click`,
+        new Blob([JSON.stringify({ postId: post.id })], { type: 'application/json' })
+      );
+    } catch {}
+  }
 
   const session = useSession();
   const user = $derived($session.data?.user);
@@ -94,6 +104,7 @@
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
+        onclick={trackClick}
         class="text-lg text-foreground hover:underline"
       >
         {post.title}

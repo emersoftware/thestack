@@ -10,6 +10,7 @@ import users from './routes/users';
 import sites from './routes/sites';
 import admin from './routes/admin';
 import comments from './routes/comments';
+import track from './routes/track';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
 import { sendWeeklyNewsletter } from './lib/newsletter';
@@ -78,6 +79,7 @@ app.use('/api/users/*', sessionMiddleware);
 app.use('/api/admin/*', sessionMiddleware);
 app.use('/api/sites/*', sessionMiddleware);
 
+app.route('/api/track', track);
 app.route('/api/health', health);
 app.route('/api/auth', auth);
 app.route('/api/posts', posts);
