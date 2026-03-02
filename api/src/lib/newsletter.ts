@@ -129,9 +129,9 @@ export async function createWeeklyDraft(
   env: Env
 ): Promise<schema.NewsletterSend> {
   const db = drizzle(env.DB, { schema });
-  const weekStart = getCurrentWeekStart();
+  const nextMonday = getNextMondayAt18UTC();
 
-  // Check if draft/scheduled already exists for this week
+  // Check if draft/scheduled already exists for the same send date
   const [existing] = await db
     .select()
     .from(schema.newsletterSends)
@@ -141,7 +141,7 @@ export async function createWeeklyDraft(
           eq(schema.newsletterSends.status, 'draft'),
           eq(schema.newsletterSends.status, 'scheduled')
         ),
-        gte(schema.newsletterSends.createdAt, weekStart)
+        eq(schema.newsletterSends.scheduledFor, nextMonday)
       )
     )
     .limit(1);
@@ -151,7 +151,6 @@ export async function createWeeklyDraft(
   }
 
   const now = new Date();
-  const nextMonday = getNextMondayAt18UTC();
   const id = crypto.randomUUID();
   const subject = getWeeklySubject();
 
@@ -338,8 +337,8 @@ export async function sendWeeklyNewsletter(
       if (found.status === 'sent') throw new Error(`Send ${sendId} already sent`);
       send = found;
     } else {
-      // Look for existing draft/scheduled for this week
-      const weekStart = getCurrentWeekStart();
+      // Look for existing draft/scheduled for this week's send date
+      const nextMonday = getNextMondayAt18UTC();
       const [existing] = await db
         .select()
         .from(schema.newsletterSends)
@@ -349,7 +348,7 @@ export async function sendWeeklyNewsletter(
               eq(schema.newsletterSends.status, 'draft'),
               eq(schema.newsletterSends.status, 'scheduled')
             ),
-            gte(schema.newsletterSends.createdAt, weekStart)
+            eq(schema.newsletterSends.scheduledFor, nextMonday)
           )
         )
         .limit(1);

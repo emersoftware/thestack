@@ -330,20 +330,14 @@ admin.get('/newsletter/status', async (c) => {
     const nextSendAt = getNextMondayAt18UTC();
     const secondsUntilNextSend = Math.max(0, Math.floor((nextSendAt.getTime() - Date.now()) / 1000));
 
-    // Find current draft/scheduled
-    const weekStart = new Date();
-    const day = weekStart.getUTCDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    weekStart.setUTCDate(weekStart.getUTCDate() + diff);
-    weekStart.setUTCHours(0, 0, 0, 0);
-
+    // Find current draft/scheduled by send date
     const [currentDraft] = await db
       .select()
       .from(schema.newsletterSends)
       .where(
         and(
           sql`${schema.newsletterSends.status} IN ('draft', 'scheduled')`,
-          gte(schema.newsletterSends.createdAt, weekStart)
+          eq(schema.newsletterSends.scheduledFor, nextSendAt)
         )
       )
       .limit(1);
@@ -411,20 +405,16 @@ admin.post('/newsletter/draft', async (c) => {
       return c.json({ error: 'Subject es requerido' }, 400);
     }
 
-    const weekStart = new Date();
-    const day = weekStart.getUTCDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    weekStart.setUTCDate(weekStart.getUTCDate() + diff);
-    weekStart.setUTCHours(0, 0, 0, 0);
+    const nextMonday = getNextMondayAt18UTC();
 
-    // Check for existing draft/scheduled this week
+    // Check for existing draft/scheduled for the same send date
     const [existing] = await db
       .select()
       .from(schema.newsletterSends)
       .where(
         and(
           sql`${schema.newsletterSends.status} IN ('draft', 'scheduled')`,
-          gte(schema.newsletterSends.createdAt, weekStart)
+          eq(schema.newsletterSends.scheduledFor, nextMonday)
         )
       )
       .limit(1);
@@ -441,7 +431,6 @@ admin.post('/newsletter/draft', async (c) => {
     }
 
     const id = crypto.randomUUID();
-    const nextMonday = getNextMondayAt18UTC();
 
     await db.insert(schema.newsletterSends).values({
       id,
@@ -485,6 +474,59 @@ admin.post('/newsletter/send', async (c) => {
   } catch (error) {
     console.error('Error sending newsletter:', error);
     return c.json({ error: 'Error al enviar newsletter' }, 500);
+  }
+});
+
+// GET /admin/feeds - list all feeds with owner info
+admin.get('/feeds', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+
+  try {
+    const result = await db
+      .select({
+        id: schema.feeds.id,
+        name: schema.feeds.name,
+        emailHash: schema.feeds.emailHash,
+        autoPublish: schema.feeds.autoPublish,
+        isActive: schema.feeds.isActive,
+        lastProcessedAt: schema.feeds.lastProcessedAt,
+        createdAt: schema.feeds.createdAt,
+        userId: schema.feeds.userId,
+        username: schema.users.username,
+      })
+      .from(schema.feeds)
+      .leftJoin(schema.users, eq(schema.feeds.userId, schema.users.id))
+      .orderBy(desc(schema.feeds.createdAt));
+
+    return c.json({
+      feeds: result.map((f) => ({
+        id: f.id,
+        name: f.name,
+        email: `feed-${f.emailHash}@thestack.cl`,
+        autoPublish: f.autoPublish,
+        isActive: f.isActive,
+        lastProcessedAt: f.lastProcessedAt ? new Date(f.lastProcessedAt).toISOString() : null,
+        createdAt: new Date(f.createdAt).toISOString(),
+        owner: { id: f.userId, username: f.username || 'unknown' },
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching admin feeds:', error);
+    return c.json({ error: 'Error al obtener feeds' }, 500);
+  }
+});
+
+// DELETE /admin/feeds/:id - delete any feed
+admin.delete('/feeds/:id', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const feedId = c.req.param('id');
+
+  try {
+    await db.delete(schema.feeds).where(eq(schema.feeds.id, feedId));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting feed:', error);
+    return c.json({ error: 'Error al eliminar feed' }, 500);
   }
 });
 
