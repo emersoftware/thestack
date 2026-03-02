@@ -38,22 +38,30 @@ export function getWeeklySubject(): string {
 }
 
 /**
- * Get next Monday at 18:00 UTC
+ * Get the current week's Monday at 18:00 UTC.
+ * On Monday before/at 18:00 → returns today.
+ * On Monday after 18:00 or Tue-Sun → returns this week's Monday.
+ * Used for matching scheduledFor when sending/looking up the current newsletter.
  */
-export function getNextMondayAt18UTC(): Date {
-  const now = new Date();
+export function getCurrentMondayAt18UTC(now: Date = new Date()): Date {
   const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
-  let daysUntilMonday = (1 - day + 7) % 7;
-  if (daysUntilMonday === 0) {
-    // If today is Monday, check if we've already passed 18:00 UTC
-    if (now.getUTCHours() >= 18) {
-      daysUntilMonday = 7;
-    }
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setUTCDate(monday.getUTCDate() + diff);
+  monday.setUTCHours(18, 0, 0, 0);
+  return monday;
+}
+
+/**
+ * Get next Monday at 18:00 UTC (always in the future).
+ * Used when creating new drafts to set their scheduledFor.
+ */
+export function getNextMondayAt18UTC(now: Date = new Date()): Date {
+  const monday = getCurrentMondayAt18UTC(now);
+  if (monday.getTime() <= now.getTime()) {
+    monday.setUTCDate(monday.getUTCDate() + 7);
   }
-  const next = new Date(now);
-  next.setUTCDate(next.getUTCDate() + daysUntilMonday);
-  next.setUTCHours(18, 0, 0, 0);
-  return next;
+  return monday;
 }
 
 /**
@@ -338,7 +346,7 @@ export async function sendWeeklyNewsletter(
       send = found;
     } else {
       // Look for existing draft/scheduled for this week's send date
-      const nextMonday = getNextMondayAt18UTC();
+      const nextMonday = getCurrentMondayAt18UTC();
       const [existing] = await db
         .select()
         .from(schema.newsletterSends)
