@@ -14,9 +14,6 @@ export interface FeedLog {
   id: string;
   emailSubject: string | null;
   emailFrom: string | null;
-  linksFound: number;
-  linksPublished: number;
-  linksSkipped: number;
   status: 'processing' | 'completed' | 'error' | 'rate_limited';
   error: string | null;
   createdAt: string;

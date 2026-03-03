@@ -250,11 +250,7 @@ export async function runFeedAgent(
   const now = new Date();
   await db.batch([
     db.update(schema.feedLogs)
-      .set({
-        linksPublished: published,
-        linksSkipped: skipped,
-        status: 'completed',
-      })
+      .set({ status: 'completed' })
       .where(eq(schema.feedLogs.id, logId)),
     db.update(schema.feeds)
       .set({ lastProcessedAt: now, updatedAt: now })

@@ -131,6 +131,10 @@ export async function deleteAdminFeed(id: string): Promise<{ success: boolean }>
   return apiFetch(`/api/admin/feeds/${id}`, { method: 'DELETE' });
 }
 
+export async function retryFeedLog(logId: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/admin/feeds/logs/${logId}/retry`, { method: 'POST' });
+}
+
 // ─── Analytics ───
 
 function dateParams(start: string, end: string): string {

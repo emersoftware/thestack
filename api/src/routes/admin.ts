@@ -516,6 +516,76 @@ admin.get('/feeds', async (c) => {
   }
 });
 
+// POST /admin/feeds/logs/:logId/retry - retry a failed feed log
+admin.post('/feeds/logs/:logId/retry', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  const logId = c.req.param('logId');
+
+  try {
+    const [log] = await db
+      .select()
+      .from(schema.feedLogs)
+      .where(eq(schema.feedLogs.id, logId))
+      .limit(1);
+
+    if (!log) {
+      return c.json({ error: 'Log no encontrado' }, 404);
+    }
+
+    if (log.status !== 'error') {
+      return c.json({ error: 'Solo se pueden reintentar logs con error' }, 400);
+    }
+
+    if (!log.rawBody) {
+      return c.json({ error: 'No hay contenido guardado para reintentar' }, 400);
+    }
+
+    const [feed] = await db
+      .select()
+      .from(schema.feeds)
+      .where(eq(schema.feeds.id, log.feedId))
+      .limit(1);
+
+    if (!feed) {
+      return c.json({ error: 'Feed no encontrado' }, 404);
+    }
+
+    // Re-extract links from stored raw body
+    const { extractLinks, extractLinksFromText } = await import('../lib/email-handler');
+    const links = extractLinks(log.rawBody);
+    if (links.length === 0) {
+      const textLinks = extractLinksFromText(log.rawBody);
+      links.push(...textLinks);
+    }
+
+    const agentRawBody = links.length === 0 ? log.rawBody : undefined;
+
+    // Reset log status to processing
+    await db
+      .update(schema.feedLogs)
+      .set({ status: 'processing', error: null })
+      .where(eq(schema.feedLogs.id, logId));
+
+    // Run agent
+    const { runFeedAgent } = await import('../lib/feed-agent');
+    c.executionCtx.waitUntil(
+      runFeedAgent(links, feed, logId, c.env, agentRawBody).catch(async (err) => {
+        console.error('[Feed Agent Retry] Error:', err);
+        const dbInner = drizzle(c.env.DB, { schema });
+        await dbInner
+          .update(schema.feedLogs)
+          .set({ status: 'error', error: String(err) })
+          .where(eq(schema.feedLogs.id, logId));
+      })
+    );
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error retrying feed log:', error);
+    return c.json({ error: 'Error al reintentar' }, 500);
+  }
+});
+
 // DELETE /admin/feeds/:id - delete any feed
 admin.delete('/feeds/:id', async (c) => {
   const db = drizzle(c.env.DB, { schema });

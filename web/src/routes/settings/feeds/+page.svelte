@@ -184,9 +184,6 @@
                   {#if log.emailFrom}
                     <span>De: {log.emailFrom}</span>
                   {/if}
-                  <span>Links: {log.linksFound}</span>
-                  <span>Publicados: {log.linksPublished}</span>
-                  <span>Omitidos: {log.linksSkipped}</span>
                 </div>
                 {#if log.error}
                   <p class="mt-1 text-error">{log.error}</p>

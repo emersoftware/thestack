@@ -61,6 +61,10 @@ export async function handleIncomingEmail(
     const parser = new PostalMime();
     const parsed = await parser.parse(rawEmail);
 
+    // Store the email body for potential retries
+    const bodyContent = parsed.html || parsed.text || '';
+    const rawBody = bodyContent.slice(0, 16000);
+
     // Extract links from HTML body
     const links = extractLinks(parsed.html || '');
 
@@ -70,10 +74,8 @@ export async function handleIncomingEmail(
       links.push(...textLinks);
     }
 
-    // If still no links, pass raw body to agent as fallback
-    const rawBody = links.length === 0
-      ? (parsed.text || parsed.html || '').slice(0, 8000)
-      : undefined;
+    // If no links found at all, agent will work from rawBody
+    const agentRawBody = links.length === 0 ? rawBody : undefined;
 
     if (links.length === 0 && !rawBody) {
       await db.insert(schema.feedLogs).values({
@@ -81,28 +83,28 @@ export async function handleIncomingEmail(
         feedId: feed.id,
         emailSubject: parsed.subject || null,
         emailFrom: message.from,
-        linksFound: 0,
+        rawBody: null,
         status: 'completed',
         createdAt: new Date(),
       });
       return;
     }
 
-    // Create log entry
+    // Create log entry with raw body for retry capability
     const logId = generateId();
     await db.insert(schema.feedLogs).values({
       id: logId,
       feedId: feed.id,
       emailSubject: parsed.subject || null,
       emailFrom: message.from,
-      linksFound: links.length,
+      rawBody,
       status: 'processing',
       createdAt: new Date(),
     });
 
     // Process with agent in background
     ctx.waitUntil(
-      runFeedAgent(links, feed, logId, env, rawBody).catch((err) => {
+      runFeedAgent(links, feed, logId, env, agentRawBody).catch((err) => {
         console.error('[Feed Agent] Error:', err);
         const dbInner = drizzle(env.DB, { schema });
         return dbInner
@@ -116,22 +118,18 @@ export async function handleIncomingEmail(
   }
 }
 
-function extractLinks(html: string): string[] {
+export function extractLinks(html: string): string[] {
   const seen = new Set<string>();
   const links: string[] = [];
 
-  // Use regex to extract href values from <a> tags
   const hrefRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
   let match;
 
   while ((match = hrefRegex.exec(html)) !== null) {
     const url = match[1];
-
-    // Filter: only https, deduplicate, exclude tracking/unsubscribe
     if (!url.startsWith('https://')) continue;
     if (seen.has(url)) continue;
     if (isTrackingOrUnsubscribe(url)) continue;
-
     seen.add(url);
     links.push(url);
   }
@@ -139,14 +137,14 @@ function extractLinks(html: string): string[] {
   return links;
 }
 
-function extractLinksFromText(text: string): string[] {
+export function extractLinksFromText(text: string): string[] {
   const seen = new Set<string>();
   const links: string[] = [];
   const urlRegex = /https?:\/\/[^\s<>"')\]]+/gi;
   let match;
 
   while ((match = urlRegex.exec(text)) !== null) {
-    const url = match[0].replace(/[.,;:!?]+$/, ''); // trim trailing punctuation
+    const url = match[0].replace(/[.,;:!?]+$/, '');
     if (!url.startsWith('https://')) continue;
     if (seen.has(url)) continue;
     if (isTrackingOrUnsubscribe(url)) continue;

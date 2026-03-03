@@ -33,7 +33,8 @@
     type NewsletterStatus,
     type NewsletterSendItem,
   } from '$lib/admin';
-  import { getAdminFeeds, deleteAdminFeed, type AdminFeed } from '$lib/admin';
+  import { getAdminFeeds, deleteAdminFeed, retryFeedLog, type AdminFeed } from '$lib/admin';
+  import { getFeedLogs, type FeedLog } from '$lib/feeds';
 
   let { data } = $props();
   const user = data.user!;
@@ -63,6 +64,10 @@
   let adminFeeds = $state<AdminFeed[]>([]);
   let feedsLoading = $state(false);
   let feedsTabLoaded = $state(false);
+  let feedLogs = $state<FeedLog[]>([]);
+  let feedLogsLoading = $state(false);
+  let selectedAdminFeedId = $state<string | null>(null);
+  let retryingLogId = $state<string | null>(null);
 
   // Analytics state
   const now = new Date();
@@ -253,6 +258,36 @@
       adminFeeds = adminFeeds.filter((f) => f.id !== id);
     } catch (err) {
       console.error('Error deleting feed:', err);
+    }
+  }
+
+  async function loadFeedLogs(feedId: string) {
+    if (selectedAdminFeedId === feedId) {
+      selectedAdminFeedId = null;
+      return;
+    }
+    selectedAdminFeedId = feedId;
+    feedLogsLoading = true;
+    try {
+      const data = await getFeedLogs(feedId);
+      feedLogs = data.logs;
+    } catch (err) {
+      console.error('Error loading feed logs:', err);
+    } finally {
+      feedLogsLoading = false;
+    }
+  }
+
+  async function handleRetryLog(logId: string) {
+    retryingLogId = logId;
+    try {
+      await retryFeedLog(logId);
+      // Update status locally
+      feedLogs = feedLogs.map((l) => l.id === logId ? { ...l, status: 'processing' as const, error: null } : l);
+    } catch (err) {
+      console.error('Error retrying log:', err);
+    } finally {
+      retryingLogId = null;
     }
   }
 
@@ -827,7 +862,13 @@
                   <td class="px-4 py-3 text-muted-foreground text-xs">
                     {feed.lastProcessedAt ? new Date(feed.lastProcessedAt).toLocaleDateString('es-CL') : '-'}
                   </td>
-                  <td class="px-4 py-3 text-right">
+                  <td class="px-4 py-3 text-right space-x-2">
+                    <button
+                      onclick={() => loadFeedLogs(feed.id)}
+                      class="text-xs text-accent hover:underline"
+                    >
+                      {selectedAdminFeedId === feed.id ? 'Ocultar' : 'Logs'}
+                    </button>
                     <button
                       onclick={() => handleDeleteFeed(feed.id)}
                       class="text-xs text-error hover:underline"
@@ -836,6 +877,48 @@
                     </button>
                   </td>
                 </tr>
+                {#if selectedAdminFeedId === feed.id}
+                  <tr>
+                    <td colspan="5" class="px-4 py-3 bg-muted/30">
+                      {#if feedLogsLoading}
+                        <p class="text-xs text-muted-foreground">Cargando logs...</p>
+                      {:else if feedLogs.length === 0}
+                        <p class="text-xs text-muted-foreground">No hay logs.</p>
+                      {:else}
+                        <div class="space-y-2">
+                          {#each feedLogs as log (log.id)}
+                            <div class="border border-border rounded-lg p-3 text-xs bg-card">
+                              <div class="flex items-center justify-between gap-2">
+                                <span class="font-medium text-foreground truncate">{log.emailSubject || 'Sin asunto'}</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                  <span class="px-2 py-0.5 rounded-full {log.status === 'completed' ? 'bg-success/10 text-success' : log.status === 'error' ? 'bg-error/10 text-error' : 'bg-muted text-muted-foreground'}">
+                                    {log.status}
+                                  </span>
+                                  {#if log.status === 'error'}
+                                    <button
+                                      onclick={() => handleRetryLog(log.id)}
+                                      disabled={retryingLogId === log.id}
+                                      class="px-2 py-0.5 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors disabled:opacity-50"
+                                    >
+                                      {retryingLogId === log.id ? 'Reintentando...' : 'Reintentar'}
+                                    </button>
+                                  {/if}
+                                </div>
+                              </div>
+                              {#if log.emailFrom}
+                                <p class="mt-1 text-muted-foreground">De: {log.emailFrom}</p>
+                              {/if}
+                              {#if log.error}
+                                <p class="mt-1 text-error">{log.error}</p>
+                              {/if}
+                              <p class="mt-1 text-muted-foreground">{new Date(log.createdAt).toLocaleString('es-CL')}</p>
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
+                    </td>
+                  </tr>
+                {/if}
               {/each}
             </tbody>
           </table>
