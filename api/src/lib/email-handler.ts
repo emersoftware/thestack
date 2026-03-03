@@ -64,7 +64,18 @@ export async function handleIncomingEmail(
     // Extract links from HTML body
     const links = extractLinks(parsed.html || '');
 
-    if (links.length === 0) {
+    // Fallback: if no links found in HTML, extract from plain text
+    if (links.length === 0 && parsed.text) {
+      const textLinks = extractLinksFromText(parsed.text);
+      links.push(...textLinks);
+    }
+
+    // If still no links, pass raw body to agent as fallback
+    const rawBody = links.length === 0
+      ? (parsed.text || parsed.html || '').slice(0, 8000)
+      : undefined;
+
+    if (links.length === 0 && !rawBody) {
       await db.insert(schema.feedLogs).values({
         id: generateId(),
         feedId: feed.id,
@@ -91,7 +102,7 @@ export async function handleIncomingEmail(
 
     // Process with agent in background
     ctx.waitUntil(
-      runFeedAgent(links, feed, logId, env).catch((err) => {
+      runFeedAgent(links, feed, logId, env, rawBody).catch((err) => {
         console.error('[Feed Agent] Error:', err);
         const dbInner = drizzle(env.DB, { schema });
         return dbInner
@@ -121,6 +132,24 @@ function extractLinks(html: string): string[] {
     if (seen.has(url)) continue;
     if (isTrackingOrUnsubscribe(url)) continue;
 
+    seen.add(url);
+    links.push(url);
+  }
+
+  return links;
+}
+
+function extractLinksFromText(text: string): string[] {
+  const seen = new Set<string>();
+  const links: string[] = [];
+  const urlRegex = /https?:\/\/[^\s<>"')\]]+/gi;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    const url = match[0].replace(/[.,;:!?]+$/, ''); // trim trailing punctuation
+    if (!url.startsWith('https://')) continue;
+    if (seen.has(url)) continue;
+    if (isTrackingOrUnsubscribe(url)) continue;
     seen.add(url);
     links.push(url);
   }

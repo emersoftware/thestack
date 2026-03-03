@@ -37,7 +37,8 @@ export async function runFeedAgent(
   links: string[],
   feed: Feed,
   logId: string,
-  env: Env
+  env: Env,
+  rawBody?: string
 ) {
   const db = drizzle(env.DB, { schema });
   const publishActions: PublishAction[] = [];
@@ -117,10 +118,19 @@ export async function runFeedAgent(
   }).bindTools(tools);
 
   // Run agent loop
-  const linksText = links.map((l, i) => `${i + 1}. ${l}`).join('\n');
+  let userMessage: string;
+  if (links.length > 0) {
+    const linksText = links.map((l, i) => `${i + 1}. ${l}`).join('\n');
+    userMessage = `Aqui estan los links extraidos de un newsletter. Procesa cada uno:\n\n${linksText}`;
+  } else if (rawBody) {
+    userMessage = `No pude extraer links del email. Aqui esta el contenido completo del email. Extrae las URLs que encuentres, visita las que parezcan relevantes, y usa publish_post o skip segun corresponda:\n\n${rawBody}`;
+  } else {
+    return;
+  }
+
   const messages: any[] = [
     new SystemMessage(SYSTEM_PROMPT),
-    new HumanMessage(`Here are the links extracted from a newsletter. Process each one:\n\n${linksText}`),
+    new HumanMessage(userMessage),
   ];
 
   // Max 10 iterations to prevent infinite loops
