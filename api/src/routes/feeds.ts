@@ -225,7 +225,7 @@ feeds.delete('/posts/:postId', requireAuth(), async (c) => {
 
     await db
       .update(schema.posts)
-      .set({ isDeleted: true, updatedAt: new Date() })
+      .set({ status: 'rejected', updatedAt: new Date() })
       .where(eq(schema.posts.id, postId));
 
     return c.json({ success: true });

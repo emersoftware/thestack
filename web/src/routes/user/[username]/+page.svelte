@@ -167,6 +167,15 @@
       {/if}
     </div>
 
+    {#if isOwnProfile && profile.pendingCount && profile.pendingCount > 0}
+      <a
+        href="/user/{username}/pending"
+        class="block bg-accent/10 border border-accent rounded-xl px-4 py-3 mb-4 text-sm text-accent hover:bg-accent/20 transition-colors"
+      >
+        Tienes {profile.pendingCount} {profile.pendingCount === 1 ? 'post pendiente' : 'posts pendientes'} de aprobacion &rarr;
+      </a>
+    {/if}
+
     <h2 class="text-base sm:text-lg font-medium text-foreground mb-3 sm:mb-4">Posts</h2>
     {#if posts.length === 0}
       <p class="text-muted-foreground text-center py-8">Sin posts todavía</p>

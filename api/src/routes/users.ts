@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAuth, type AuthVariables, type AuthUser } from '../middleware/auth';
@@ -37,13 +37,29 @@ users.get('/:username', async (c) => {
 
     const isOwnProfile = currentUser?.username === username;
 
+    let pendingCount: number | undefined;
+    if (isOwnProfile) {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.posts)
+        .where(
+          and(
+            eq(schema.posts.authorId, currentUser!.id),
+            eq(schema.posts.status, 'pending'),
+            eq(schema.posts.source, 'feed'),
+            eq(schema.posts.isDeleted, false)
+          )
+        );
+      pendingCount = countResult?.count || 0;
+    }
+
     return c.json({
       username: user[0].username,
       karma: user[0].karma,
       about: user[0].about,
       createdAt: user[0].createdAt ? new Date(user[0].createdAt).toISOString() : null,
-      // Only include newsletter preference for own profile
-      ...(isOwnProfile && { newsletterEnabled: user[0].newsletterEnabled }),
+      // Only include newsletter preference and pending count for own profile
+      ...(isOwnProfile && { newsletterEnabled: user[0].newsletterEnabled, pendingCount }),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -87,7 +103,8 @@ users.get('/:username/posts', async (c) => {
       .where(
         and(
           eq(schema.posts.authorId, user[0].id),
-          eq(schema.posts.isDeleted, false)
+          eq(schema.posts.isDeleted, false),
+          eq(schema.posts.status, 'published')
         )
       )
       .orderBy(desc(schema.posts.createdAt))

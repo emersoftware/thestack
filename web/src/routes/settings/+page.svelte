@@ -179,7 +179,6 @@
       <div class="bg-card border border-border rounded-xl p-4 sm:p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-base sm:text-lg font-medium text-foreground">Mis Feeds</h2>
-          <a href="/settings/feeds" class="text-xs text-accent hover:underline">Posts pendientes</a>
         </div>
 
         <p class="text-sm text-muted-foreground mb-4">

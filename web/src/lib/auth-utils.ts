@@ -65,14 +65,14 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function signInWithGitHub() {
+export async function signInWithGitHub(redirectUrl?: string) {
   // TEMPORARY: Clear legacy cookies before OAuth to prevent state_mismatch
   // Can be removed after 2025-12-18
   await clearLegacyCookies();
 
   await authClient.signIn.social({
     provider: 'github',
-    callbackURL: window.location.origin + '/',
+    callbackURL: window.location.origin + (redirectUrl || '/'),
   });
 }
 

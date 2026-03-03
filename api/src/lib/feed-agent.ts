@@ -8,6 +8,7 @@ import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
 import { extractDomain, generateId, calculateHNScore } from './utils';
 import { generateUniqueSlug } from './slug';
+import { Resend } from 'resend';
 import type { Env } from './auth';
 
 interface PublishAction {
@@ -256,4 +257,41 @@ export async function runFeedAgent(
       .set({ lastProcessedAt: now, updatedAt: now })
       .where(eq(schema.feeds.id, feed.id)),
   ]);
+
+  // Send email notification for pending posts
+  if (published > 0 && !feed.autoPublish) {
+    try {
+      const [user] = await db
+        .select({
+          email: schema.users.email,
+          name: schema.users.name,
+          username: schema.users.username,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, feed.userId))
+        .limit(1);
+
+      if (user?.email) {
+        const postTitles = publishActions.map((a) => a.title);
+        const listHtml = postTitles
+          .map((t) => `<li>${t}</li>`)
+          .join('');
+
+        const resend = new Resend(env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: 'The Stack <noreply@thestack.cl>',
+          to: user.email,
+          subject: `Tienes ${published} ${published === 1 ? 'post pendiente' : 'posts pendientes'} del feed "${feed.name}"`,
+          html: `
+            <p>Hola ${user.name || user.username},</p>
+            <p>Tu feed <strong>${feed.name}</strong> proceso ${published} ${published === 1 ? 'post' : 'posts'} que ${published === 1 ? 'requiere' : 'requieren'} tu aprobacion:</p>
+            <ul>${listHtml}</ul>
+            <p><a href="https://thestack.cl/user/${user.username}/pending">Revisar posts pendientes</a></p>
+          `,
+        });
+      }
+    } catch (err) {
+      console.error('[Feed Agent] Error sending pending notification email:', err);
+    }
+  }
 }

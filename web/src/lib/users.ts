@@ -7,6 +7,7 @@ export interface UserProfile {
   about: string | null;
   createdAt: string;
   newsletterEnabled?: boolean;
+  pendingCount?: number;
 }
 
 export interface UserPostsResponse {

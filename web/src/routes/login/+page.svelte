@@ -1,12 +1,15 @@
 <script lang="ts">
   import { signInWithEmail, signInWithGitHub } from '$lib/auth-utils';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { logoStore } from '$lib/stores/logo';
 
   let email = $state('');
   let password = $state('');
   let error = $state('');
   let loading = $state(false);
+
+  const redirectTo = $derived($page.url.searchParams.get('redirect') || '/');
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -16,7 +19,7 @@
     try {
       await signInWithEmail(email, password);
       logoStore.bump();
-      goto('/');
+      goto(redirectTo);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Error al iniciar sesión';
     } finally {
@@ -28,7 +31,7 @@
     error = '';
     loading = true;
     try {
-      await signInWithGitHub();
+      await signInWithGitHub(redirectTo);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Error con GitHub';
       loading = false;
