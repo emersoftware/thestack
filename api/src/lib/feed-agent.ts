@@ -11,7 +11,7 @@ import { generateUniqueSlug } from './slug';
 import { Resend } from 'resend';
 import type { Env } from './auth';
 
-interface PublishAction {
+export interface PublishAction {
   title: string;
   url: string;
 }
@@ -33,6 +33,103 @@ You receive links extracted from a newsletter. For each link:
 3. If it is not worth sharing, use skip with a brief reason.
 
 Process ALL links. Be selective — only publish content that would spark curiosity in a thoughtful reader.`;
+
+function escapeHtml(text: string): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return text.replace(/[&<>"']/g, (c) => entities[c] || c);
+}
+
+export function generatePendingEmailHtml(
+  userName: string,
+  feedName: string,
+  postTitles: string[],
+  username: string,
+): string {
+  const count = postTitles.length;
+  const postCards = postTitles
+    .map(
+      (title) => `
+      <tr>
+        <td style="padding: 12px 16px; background: #fafafa; border-radius: 12px; border: 1px solid #e5e5e5;">
+          <span style="color: #141414; font-size: 15px; font-weight: 500; line-height: 1.4;">
+            ${escapeHtml(title)}
+          </span>
+        </td>
+      </tr>
+      <tr><td style="height: 10px;"></td></tr>
+    `
+    )
+    .join('');
+
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Posts pendientes - the stack</title>
+    </head>
+    <body style="margin: 0; padding: 0; background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background: #fafafa;">
+        <tr>
+          <td align="center" style="padding: 40px 16px;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 480px;">
+              <!-- Header -->
+              <tr>
+                <td style="padding-bottom: 24px;">
+                  <table cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="vertical-align: middle; padding-right: 12px;">
+                        <img src="https://thestack.cl/icon.png" alt="the stack" width="36" height="36" style="display: block; border-radius: 6px;" />
+                      </td>
+                      <td style="vertical-align: middle;">
+                        <h1 style="color: #141414; font-size: 18px; font-weight: 400; margin: 0;">
+                          Posts pendientes en <strong>the stack</strong>
+                        </h1>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Intro text -->
+              <tr>
+                <td style="padding-bottom: 20px;">
+                  <p style="color: #525252; font-size: 14px; line-height: 1.5; margin: 0;">
+                    Hola ${escapeHtml(userName)}, tu feed <strong>${escapeHtml(feedName)}</strong> proces&oacute; ${count} ${count === 1 ? 'post' : 'posts'} que ${count === 1 ? 'requiere' : 'requieren'} tu aprobaci&oacute;n:
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Post cards -->
+              ${postCards}
+
+              <!-- CTA -->
+              <tr>
+                <td style="padding-top: 16px; padding-bottom: 28px; text-align: center;">
+                  <a href="https://thestack.cl/user/${encodeURIComponent(username)}/pending" style="display: inline-block; background: transparent; color: #141414; padding: 8px 16px; text-decoration: none; border-radius: 9999px; font-weight: 500; font-size: 14px; border: 1px solid #e5e5e5;">
+                    Revisar posts pendientes
+                  </a>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="border-top: 1px solid #e5e5e5; padding-top: 20px;">
+                  <p style="color: #a3a3a3; font-size: 12px; line-height: 1.5; margin: 0; text-align: center;">
+                    Recibiste este email porque tienes feeds activos en the stack.<br />
+                    <a href="https://thestack.cl/settings" style="color: #737373;">Gestionar feeds</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
 
 export async function runFeedAgent(
   links: string[],
@@ -273,21 +370,19 @@ export async function runFeedAgent(
 
       if (user?.email) {
         const postTitles = publishActions.map((a) => a.title);
-        const listHtml = postTitles
-          .map((t) => `<li>${t}</li>`)
-          .join('');
+        const html = generatePendingEmailHtml(
+          user.name || user.username,
+          feed.name,
+          postTitles,
+          user.username,
+        );
 
         const resend = new Resend(env.RESEND_API_KEY);
         await resend.emails.send({
           from: 'The Stack <noreply@thestack.cl>',
           to: user.email,
           subject: `Tienes ${published} ${published === 1 ? 'post pendiente' : 'posts pendientes'} del feed "${feed.name}"`,
-          html: `
-            <p>Hola ${user.name || user.username},</p>
-            <p>Tu feed <strong>${feed.name}</strong> proceso ${published} ${published === 1 ? 'post' : 'posts'} que ${published === 1 ? 'requiere' : 'requieren'} tu aprobacion:</p>
-            <ul>${listHtml}</ul>
-            <p><a href="https://thestack.cl/user/${user.username}/pending">Revisar posts pendientes</a></p>
-          `,
+          html,
         });
       }
     } catch (err) {
