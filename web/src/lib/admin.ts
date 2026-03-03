@@ -110,6 +110,27 @@ export async function sendNewsletter(sendId?: string): Promise<NewsletterResult 
   });
 }
 
+// ─── Feeds ───
+
+export interface AdminFeed {
+  id: string;
+  name: string;
+  email: string;
+  autoPublish: boolean;
+  isActive: boolean;
+  lastProcessedAt: string | null;
+  createdAt: string;
+  owner: { id: string; username: string };
+}
+
+export async function getAdminFeeds(): Promise<{ feeds: AdminFeed[] }> {
+  return apiFetch('/api/admin/feeds');
+}
+
+export async function deleteAdminFeed(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/admin/feeds/${id}`, { method: 'DELETE' });
+}
+
 // ─── Analytics ───
 
 function dateParams(start: string, end: string): string {

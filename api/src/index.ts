@@ -11,9 +11,11 @@ import sites from './routes/sites';
 import admin from './routes/admin';
 import comments from './routes/comments';
 import track from './routes/track';
+import feeds from './routes/feeds';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
 import { sendWeeklyNewsletter, createWeeklyDraft } from './lib/newsletter';
+import { handleIncomingEmail } from './lib/email-handler';
 import type { Env } from './lib/auth';
 import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 
@@ -78,6 +80,7 @@ app.use('/api/comments/*', sessionMiddleware);
 app.use('/api/users/*', sessionMiddleware);
 app.use('/api/admin/*', sessionMiddleware);
 app.use('/api/sites/*', sessionMiddleware);
+app.use('/api/feeds/*', sessionMiddleware);
 
 app.route('/api/track', track);
 app.route('/api/health', health);
@@ -86,6 +89,7 @@ app.route('/api/posts', posts);
 app.route('/api/users', users);
 app.route('/api/sites', sites);
 app.route('/api/admin', admin);
+app.route('/api/feeds', feeds);
 app.route('/api/comments', comments);
 
 app.get('/', (c) => {
@@ -108,6 +112,10 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
 
+  async email(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
+    await handleIncomingEmail(message, env, ctx);
+  },
+
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const db = drizzle(env.DB, { schema });
 
@@ -126,7 +134,8 @@ export default {
           .where(
             and(
               gte(schema.posts.createdAt, cutoffTime),
-              eq(schema.posts.isDeleted, false)
+              eq(schema.posts.isDeleted, false),
+              eq(schema.posts.status, 'published')
             )
           );
 

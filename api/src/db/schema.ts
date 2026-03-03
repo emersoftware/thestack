@@ -76,6 +76,49 @@ export const verifications = sqliteTable('verifications', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
 });
 
+export const feeds = sqliteTable(
+  'feeds',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    emailHash: text('email_hash').notNull().unique(),
+    autoPublish: integer('auto_publish', { mode: 'boolean' }).default(false).notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
+    lastProcessedAt: integer('last_processed_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_feeds_user').on(table.userId),
+    uniqueIndex('idx_feeds_email_hash').on(table.emailHash),
+  ]
+);
+
+export const feedLogs = sqliteTable(
+  'feed_logs',
+  {
+    id: text('id').primaryKey(),
+    feedId: text('feed_id')
+      .notNull()
+      .references(() => feeds.id, { onDelete: 'cascade' }),
+    emailSubject: text('email_subject'),
+    emailFrom: text('email_from'),
+    linksFound: integer('links_found').default(0),
+    linksPublished: integer('links_published').default(0),
+    linksSkipped: integer('links_skipped').default(0),
+    status: text('status').notNull().default('processing'),
+    error: text('error'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('idx_feed_logs_feed').on(table.feedId),
+    index('idx_feed_logs_created_at').on(table.createdAt),
+  ]
+);
+
 export const posts = sqliteTable(
   'posts',
   {
@@ -90,6 +133,9 @@ export const posts = sqliteTable(
     upvotesCount: integer('upvotes_count').default(0).notNull(),
     score: real('score').default(0).notNull(),
     isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false).notNull(),
+    source: text('source'),
+    feedId: text('feed_id').references(() => feeds.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('published'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
@@ -246,6 +292,10 @@ export const newsletterOpens = sqliteTable(
   ]
 );
 
+export type Feed = typeof feeds.$inferSelect;
+export type NewFeed = typeof feeds.$inferInsert;
+export type FeedLog = typeof feedLogs.$inferSelect;
+export type NewFeedLog = typeof feedLogs.$inferInsert;
 export type PageView = typeof pageViews.$inferSelect;
 export type LinkClick = typeof linkClicks.$inferSelect;
 export type NewsletterOpen = typeof newsletterOpens.$inferSelect;

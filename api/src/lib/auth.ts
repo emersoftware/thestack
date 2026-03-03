@@ -13,6 +13,7 @@ export type Env = {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   RESEND_API_KEY: string;
+  GOOGLE_API_KEY: string;
 };
 
 export const createAuth = (env: Env) => {

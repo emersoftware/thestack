@@ -14,6 +14,7 @@ export interface Post {
   score: number;
   createdAt: string;
   hasUpvoted?: boolean;
+  source?: string | null;
 }
 
 export interface PostsResponse {

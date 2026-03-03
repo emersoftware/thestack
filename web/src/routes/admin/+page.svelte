@@ -33,11 +33,12 @@
     type NewsletterStatus,
     type NewsletterSendItem,
   } from '$lib/admin';
+  import { getAdminFeeds, deleteAdminFeed, type AdminFeed } from '$lib/admin';
 
   let { data } = $props();
   const user = data.user!;
 
-  let activeTab = $state<'analytics' | 'users' | 'posts' | 'newsletter'>('analytics');
+  let activeTab = $state<'analytics' | 'users' | 'posts' | 'newsletter' | 'feeds'>('analytics');
   let stats = $state<AdminStats | null>(null);
   let users = $state<AdminUser[]>([]);
   let posts = $state<AdminPost[]>([]);
@@ -57,6 +58,11 @@
   let nlLoading = $state(false);
   let nlTabLoaded = $state(false);
   let countdownInterval: ReturnType<typeof setInterval> | undefined;
+
+  // Feeds state
+  let adminFeeds = $state<AdminFeed[]>([]);
+  let feedsLoading = $state(false);
+  let feedsTabLoaded = $state(false);
 
   // Analytics state
   const now = new Date();
@@ -228,9 +234,37 @@
     }
   }
 
+  async function loadFeedsTab() {
+    feedsLoading = true;
+    try {
+      const data = await getAdminFeeds();
+      adminFeeds = data.feeds;
+    } catch (err) {
+      console.error('Error loading feeds:', err);
+    } finally {
+      feedsLoading = false;
+      feedsTabLoaded = true;
+    }
+  }
+
+  async function handleDeleteFeed(id: string) {
+    try {
+      await deleteAdminFeed(id);
+      adminFeeds = adminFeeds.filter((f) => f.id !== id);
+    } catch (err) {
+      console.error('Error deleting feed:', err);
+    }
+  }
+
   $effect(() => {
     if (activeTab === 'newsletter' && !nlTabLoaded) {
       loadNewsletterTab();
+    }
+  });
+
+  $effect(() => {
+    if (activeTab === 'feeds' && !feedsTabLoaded) {
+      loadFeedsTab();
     }
   });
 
@@ -252,7 +286,7 @@
 
   <!-- Tabs -->
   <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border overflow-x-auto">
-    {#each ['analytics', 'users', 'posts', 'newsletter'] as tab}
+    {#each ['analytics', 'users', 'posts', 'newsletter', 'feeds'] as tab}
       <button
         onclick={() => (activeTab = tab as typeof activeTab)}
         class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
@@ -260,7 +294,7 @@
           ? 'text-foreground border-b-2 border-accent'
           : 'text-muted-foreground hover:text-foreground'}"
       >
-        {tab === 'analytics' ? 'Analytics' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : 'Newsletter'}
+        {tab === 'analytics' ? 'Analytics' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : tab === 'newsletter' ? 'Newsletter' : 'Feeds'}
       </button>
     {/each}
   </div>
@@ -761,6 +795,51 @@
             </div>
           </div>
         {/if}
+      {/if}
+    {/if}
+
+    <!-- Feeds Tab -->
+    {#if activeTab === 'feeds'}
+      {#if feedsLoading && !feedsTabLoaded}
+        <p class="text-muted-foreground text-center py-8">Cargando feeds...</p>
+      {:else if adminFeeds.length === 0}
+        <p class="text-muted-foreground text-center py-8">No hay feeds creados.</p>
+      {:else}
+        <div class="bg-card border border-border rounded-xl overflow-x-auto">
+          <table class="w-full text-xs sm:text-sm min-w-[500px]">
+            <thead class="bg-card border-b border-border">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium text-foreground">Usuario</th>
+                <th class="text-left px-4 py-3 font-medium text-foreground">Nombre</th>
+                <th class="text-left px-4 py-3 font-medium text-foreground">Email</th>
+                <th class="text-left px-4 py-3 font-medium text-foreground">Ultimo</th>
+                <th class="text-right px-4 py-3 font-medium text-foreground">Accion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each adminFeeds as feed (feed.id)}
+                <tr class="border-b border-border last:border-0">
+                  <td class="px-4 py-3 text-foreground">{feed.owner.username}</td>
+                  <td class="px-4 py-3 text-foreground">{feed.name}</td>
+                  <td class="px-4 py-3">
+                    <code class="text-xs text-muted-foreground">{feed.email}</code>
+                  </td>
+                  <td class="px-4 py-3 text-muted-foreground text-xs">
+                    {feed.lastProcessedAt ? new Date(feed.lastProcessedAt).toLocaleDateString('es-CL') : '-'}
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <button
+                      onclick={() => handleDeleteFeed(feed.id)}
+                      class="text-xs text-error hover:underline"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     {/if}
   {/if}

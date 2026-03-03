@@ -40,10 +40,11 @@ posts.get('/', async (c) => {
         createdAt: schema.posts.createdAt,
         authorId: schema.posts.authorId,
         authorUsername: schema.users.username,
+        source: schema.posts.source,
       })
       .from(schema.posts)
       .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .where(eq(schema.posts.isDeleted, false))
+      .where(and(eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published')))
       .orderBy(orderBy)
       .limit(limit + 1)
       .offset(offset);
@@ -80,6 +81,7 @@ posts.get('/', async (c) => {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
       },
+      source: post.source || null,
       ...(user && { hasUpvoted: userUpvotes.has(post.id) }),
     }));
 
@@ -120,8 +122,8 @@ posts.get('/:identifier', async (c) => {
 
   try {
     const whereClause = isLookupByUUID
-      ? and(eq(schema.posts.id, identifier), eq(schema.posts.isDeleted, false))
-      : and(eq(schema.posts.slug, identifier), eq(schema.posts.isDeleted, false));
+      ? and(eq(schema.posts.id, identifier), eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published'))
+      : and(eq(schema.posts.slug, identifier), eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published'));
 
     const result = await db
       .select({
@@ -135,6 +137,7 @@ posts.get('/:identifier', async (c) => {
         createdAt: schema.posts.createdAt,
         authorId: schema.posts.authorId,
         authorUsername: schema.users.username,
+        source: schema.posts.source,
       })
       .from(schema.posts)
       .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
@@ -176,6 +179,7 @@ posts.get('/:identifier', async (c) => {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
       },
+      source: post.source || null,
       ...(user && { hasUpvoted }),
     };
 
@@ -377,7 +381,7 @@ posts.post('/:id/upvote', requireVerifiedEmail(), async (c) => {
     const existingPost = await db
       .select()
       .from(schema.posts)
-      .where(and(eq(schema.posts.id, postId), eq(schema.posts.isDeleted, false)))
+      .where(and(eq(schema.posts.id, postId), eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published')))
       .limit(1);
 
     if (existingPost.length === 0) {
