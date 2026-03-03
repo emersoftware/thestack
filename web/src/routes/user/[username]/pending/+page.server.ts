@@ -22,6 +22,7 @@ export const load: PageServerLoad = async ({ params, fetch, request }) => {
       url: string;
       domain: string;
       createdAt: string | null;
+      feedName: string | null;
     }>,
     username: params.username,
   };

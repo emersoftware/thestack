@@ -25,6 +25,7 @@ export interface PendingPost {
   url: string;
   domain: string;
   createdAt: string | null;
+  feedName: string | null;
 }
 
 export async function getMyFeeds(): Promise<{ feeds: Feed[] }> {
@@ -55,6 +56,13 @@ export async function getFeedLogs(id: string): Promise<{ logs: FeedLog[] }> {
 
 export async function getPendingPosts(): Promise<{ posts: PendingPost[] }> {
   return apiFetch('/api/feeds/pending');
+}
+
+export async function updateFeedPostTitle(postId: string, title: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/feeds/posts/${postId}/title`, {
+    method: 'PUT',
+    body: JSON.stringify({ title }),
+  });
 }
 
 export async function approveFeedPost(postId: string): Promise<{ success: boolean }> {

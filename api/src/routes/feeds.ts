@@ -123,8 +123,10 @@ feeds.get('/pending', requireAuth(), async (c) => {
         url: schema.posts.url,
         domain: schema.posts.domain,
         createdAt: schema.posts.createdAt,
+        feedName: schema.feeds.name,
       })
       .from(schema.posts)
+      .leftJoin(schema.feeds, eq(schema.posts.feedId, schema.feeds.id))
       .where(
         and(
           eq(schema.posts.authorId, user.id),
@@ -142,6 +144,7 @@ feeds.get('/pending', requireAuth(), async (c) => {
         url: p.url,
         domain: p.domain,
         createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : null,
+        feedName: p.feedName,
       })),
     });
   } catch (error) {
@@ -196,6 +199,51 @@ feeds.put('/posts/:postId/approve', requireAuth(), async (c) => {
   } catch (error) {
     console.error('Error approving post:', error);
     return c.json({ error: 'Error al aprobar post' }, 500);
+  }
+});
+
+// PUT /api/feeds/posts/:postId/title - update title of a pending post
+feeds.put('/posts/:postId/title', requireAuth(), async (c) => {
+  const user = c.get('user') as AuthUser;
+  const db = drizzle(c.env.DB, { schema });
+  const postId = c.req.param('postId');
+
+  try {
+    const body = await c.req.json();
+    const title = body.title?.trim();
+    if (!title || title.length === 0) {
+      return c.json({ error: 'Titulo es requerido' }, 400);
+    }
+    if (title.length > 200) {
+      return c.json({ error: 'Titulo muy largo (max 200)' }, 400);
+    }
+
+    const [post] = await db
+      .select({ id: schema.posts.id })
+      .from(schema.posts)
+      .where(
+        and(
+          eq(schema.posts.id, postId),
+          eq(schema.posts.authorId, user.id),
+          eq(schema.posts.status, 'pending'),
+          eq(schema.posts.source, 'feed')
+        )
+      )
+      .limit(1);
+
+    if (!post) {
+      return c.json({ error: 'Post no encontrado' }, 404);
+    }
+
+    await db
+      .update(schema.posts)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(schema.posts.id, postId));
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error updating post title:', error);
+    return c.json({ error: 'Error al actualizar titulo' }, 500);
   }
 });
 
