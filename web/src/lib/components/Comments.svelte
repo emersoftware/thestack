@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Comment } from '$lib/comments';
   import { createComment, deleteComment, toggleCommentUpvote, getMyCommentUpvotes } from '$lib/comments';
-  import { useSession } from '$lib/auth';
+  import { useSession, type CustomUser } from '$lib/auth';
   import { goto } from '$app/navigation';
   import { toast } from '$lib/toast';
   import { ApiError } from '$lib/api';
@@ -10,7 +10,7 @@
   let { postId, initialComments = [] }: { postId: string; initialComments?: Comment[] } = $props();
 
   const session = useSession();
-  const user = $derived($session.data?.user);
+  const user = $derived($session.data?.user as CustomUser | undefined);
 
   let comments = $state<Comment[]>(initialComments);
   let newComment = $state('');
