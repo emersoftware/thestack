@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, gte } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { generateId, calculateHNScore } from '../lib/utils';
@@ -175,6 +175,23 @@ feeds.put('/posts/:postId/approve', requireAuth(), async (c) => {
 
     if (!post) {
       return c.json({ error: 'Post no encontrado' }, 404);
+    }
+
+    // Rate limit: max 10 published posts per day per user
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const [todayPosts] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.posts)
+      .where(
+        and(
+          eq(schema.posts.authorId, user.id),
+          gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY)),
+          eq(schema.posts.status, 'published')
+        )
+      );
+
+    if ((todayPosts?.count || 0) >= 10) {
+      return c.json({ error: 'Has alcanzado el limite de 10 posts publicados por dia' }, 429);
     }
 
     const now = new Date();

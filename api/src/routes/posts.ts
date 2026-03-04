@@ -224,12 +224,13 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     .where(
       and(
         eq(schema.posts.authorId, user.id),
-        gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY))
+        gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY)),
+        eq(schema.posts.status, 'published')
       )
     );
 
-  if ((todayPosts[0]?.count || 0) >= 5) {
-    return c.json({ error: 'Has alcanzado el limite de 5 posts por dia' }, 429);
+  if ((todayPosts[0]?.count || 0) >= 10) {
+    return c.json({ error: 'Has alcanzado el limite de 10 posts publicados por dia' }, 429);
   }
 
   try {

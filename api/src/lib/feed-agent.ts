@@ -3,7 +3,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and, gte } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
 import { extractDomain, generateId, calculateHNScore } from './utils';
@@ -262,6 +262,7 @@ export async function runFeedAgent(
 
   // Post-processing: create posts for each publish action
   let published = 0;
+  let pendingByRateLimit = 0;
   let skipped = skipActions.length;
 
   for (const action of publishActions) {
@@ -284,13 +285,37 @@ export async function runFeedAgent(
         continue;
       }
 
-      const slug = await generateUniqueSlug(db, action.title);
       const now = new Date();
-      const postId = generateId();
       const isAutoPublish = feed.autoPublish;
-      const initialScore = isAutoPublish ? calculateHNScore(1, now) : 0;
 
+      // Rate limit: max 10 published posts per day per user
+      let rateLimitReached = false;
       if (isAutoPublish) {
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        const [todayPosts] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(schema.posts)
+          .where(
+            and(
+              eq(schema.posts.authorId, feed.userId),
+              gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY)),
+              eq(schema.posts.status, 'published')
+            )
+          );
+
+        rateLimitReached = (todayPosts?.count || 0) >= 10;
+        if (rateLimitReached) {
+          console.log(`[Feed Agent] Rate limit reached for user ${feed.userId}, creating as pending`);
+          pendingByRateLimit++;
+        }
+      }
+
+      const slug = await generateUniqueSlug(db, action.title);
+      const postId = generateId();
+      const shouldPublish = isAutoPublish && !rateLimitReached;
+      const initialScore = shouldPublish ? calculateHNScore(1, now) : 0;
+
+      if (shouldPublish) {
         await db.batch([
           db.insert(schema.posts).values({
             id: postId,
@@ -356,7 +381,8 @@ export async function runFeedAgent(
   ]);
 
   // Send email notification for pending posts
-  if (published > 0 && !feed.autoPublish) {
+  const hasPendingPosts = (published > 0 && !feed.autoPublish) || pendingByRateLimit > 0;
+  if (hasPendingPosts) {
     try {
       const [user] = await db
         .select({
