@@ -134,6 +134,7 @@ export const posts = sqliteTable(
     source: text('source'),
     feedId: text('feed_id').references(() => feeds.id, { onDelete: 'set null' }),
     status: text('status').notNull().default('published'),
+    publishedAt: integer('published_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },

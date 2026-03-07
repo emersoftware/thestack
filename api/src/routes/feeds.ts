@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql, gte } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { generateId, calculateHNScore } from '../lib/utils';
+import { getPublishedTodayCount, isOverDailyLimit, RATE_LIMIT_ERROR } from '../lib/rate-limit';
 import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const createFeedSchema = z.object({
@@ -178,20 +179,9 @@ feeds.put('/posts/:postId/approve', requireAuth(), async (c) => {
     }
 
     // Rate limit: max 10 published posts per day per user
-    const ONE_DAY = 24 * 60 * 60 * 1000;
-    const [todayPosts] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.posts)
-      .where(
-        and(
-          eq(schema.posts.authorId, user.id),
-          gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY)),
-          eq(schema.posts.status, 'published')
-        )
-      );
-
-    if ((todayPosts?.count || 0) >= 10) {
-      return c.json({ error: 'Has alcanzado el limite de 10 posts publicados por dia' }, 429);
+    const publishedCount = await getPublishedTodayCount(db, user.id);
+    if (isOverDailyLimit(publishedCount)) {
+      return c.json({ error: RATE_LIMIT_ERROR }, 429);
     }
 
     const now = new Date();
@@ -199,7 +189,7 @@ feeds.put('/posts/:postId/approve', requireAuth(), async (c) => {
 
     await db.batch([
       db.update(schema.posts)
-        .set({ status: 'published', updatedAt: now, score: initialScore, upvotesCount: 1 })
+        .set({ status: 'published', publishedAt: now, updatedAt: now, score: initialScore, upvotesCount: 1 })
         .where(eq(schema.posts.id, postId)),
       db.insert(schema.postUpvotes).values({
         id: generateId(),

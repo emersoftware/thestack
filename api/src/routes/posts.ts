@@ -6,6 +6,7 @@ import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { extractDomain, generateId, isValidUrl, calculateHNScore, isUUID } from '../lib/utils';
 import { generateUniqueSlug } from '../lib/slug';
+import { getPublishedTodayCount, isOverDailyLimit, RATE_LIMIT_ERROR } from '../lib/rate-limit';
 import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const posts = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
@@ -217,20 +218,9 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     return c.json({ error: 'Debes esperar 10 minutos entre posts' }, 429);
   }
 
-  const ONE_DAY = 24 * 60 * 60 * 1000;
-  const todayPosts = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(schema.posts)
-    .where(
-      and(
-        eq(schema.posts.authorId, user.id),
-        gte(schema.posts.createdAt, new Date(Date.now() - ONE_DAY)),
-        eq(schema.posts.status, 'published')
-      )
-    );
-
-  if ((todayPosts[0]?.count || 0) >= 10) {
-    return c.json({ error: 'Has alcanzado el limite de 10 posts publicados por dia' }, 429);
+  const publishedCount = await getPublishedTodayCount(db, user.id);
+  if (isOverDailyLimit(publishedCount)) {
+    return c.json({ error: RATE_LIMIT_ERROR }, 429);
   }
 
   try {
@@ -280,6 +270,7 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
         upvotesCount: 1,
         score: initialScore,
         isDeleted: false,
+        publishedAt: now,
         createdAt: now,
         updatedAt: now,
       }),

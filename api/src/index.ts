@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, or } from 'drizzle-orm';
 import health from './routes/health';
 import auth from './routes/auth';
 import posts from './routes/posts';
@@ -128,19 +128,23 @@ export default {
           .select({
             id: schema.posts.id,
             upvotesCount: schema.posts.upvotesCount,
+            publishedAt: schema.posts.publishedAt,
             createdAt: schema.posts.createdAt,
           })
           .from(schema.posts)
           .where(
             and(
-              gte(schema.posts.createdAt, cutoffTime),
+              or(
+                gte(schema.posts.publishedAt, cutoffTime),
+                gte(schema.posts.createdAt, cutoffTime)
+              ),
               eq(schema.posts.isDeleted, false),
               eq(schema.posts.status, 'published')
             )
           );
 
         for (const post of recentPosts) {
-          const newScore = calculateHNScore(post.upvotesCount, post.createdAt);
+          const newScore = calculateHNScore(post.upvotesCount, post.publishedAt ?? post.createdAt);
 
           await db
             .update(schema.posts)
