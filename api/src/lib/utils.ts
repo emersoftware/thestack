@@ -79,3 +79,16 @@ export function isUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
+
+export const FEED_TYPES = ['email', 'rss', 'blog'] as const;
+export type FeedType = (typeof FEED_TYPES)[number];
+
+export const FEED_BOT_USER_AGENT = 'TheStack-FeedBot/1.0';
+
+/**
+ * escape special characters for HTML/XML output
+ */
+export function escapeHtml(text: string): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return text.replace(/[&<>"']/g, (c) => entities[c] || c);
+}

@@ -486,7 +486,9 @@ admin.get('/feeds', async (c) => {
       .select({
         id: schema.feeds.id,
         name: schema.feeds.name,
-        emailHash: schema.feeds.emailHash,
+        hash: schema.feeds.hash,
+        type: schema.feeds.type,
+        sourceUrl: schema.feeds.sourceUrl,
         autoPublish: schema.feeds.autoPublish,
         isActive: schema.feeds.isActive,
         lastProcessedAt: schema.feeds.lastProcessedAt,
@@ -502,7 +504,9 @@ admin.get('/feeds', async (c) => {
       feeds: result.map((f) => ({
         id: f.id,
         name: f.name,
-        email: `feed-${f.emailHash}@thestack.cl`,
+        type: f.type,
+        email: f.type === 'email' ? `feed-${f.hash}@thestack.cl` : null,
+        sourceUrl: f.sourceUrl,
         autoPublish: f.autoPublish,
         isActive: f.isActive,
         lastProcessedAt: f.lastProcessedAt ? new Date(f.lastProcessedAt).toISOString() : null,
@@ -551,7 +555,7 @@ admin.post('/feeds/logs/:logId/retry', async (c) => {
     }
 
     // Re-extract links from stored raw body
-    const { extractLinks, extractLinksFromText } = await import('../lib/email-handler');
+    const { extractLinks, extractLinksFromText } = await import('../lib/link-utils');
     const links = extractLinks(log.rawBody);
     if (links.length === 0) {
       const textLinks = extractLinksFromText(log.rawBody);

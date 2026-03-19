@@ -889,7 +889,7 @@
                           {#each feedLogs as log (log.id)}
                             <div class="border border-border rounded-lg p-3 text-xs bg-card">
                               <div class="flex items-center justify-between gap-2">
-                                <span class="font-medium text-foreground truncate">{log.emailSubject || 'Sin asunto'}</span>
+                                <span class="font-medium text-foreground truncate">{log.subject || 'Sin asunto'}</span>
                                 <div class="flex items-center gap-2 shrink-0">
                                   <span class="px-2 py-0.5 rounded-full {log.status === 'completed' ? 'bg-success/10 text-success' : log.status === 'error' ? 'bg-error/10 text-error' : 'bg-muted text-muted-foreground'}">
                                     {log.status}
@@ -905,8 +905,8 @@
                                   {/if}
                                 </div>
                               </div>
-                              {#if log.emailFrom}
-                                <p class="mt-1 text-muted-foreground">De: {log.emailFrom}</p>
+                              {#if log.source}
+                                <p class="mt-1 text-muted-foreground">Fuente: {log.source}</p>
                               {/if}
                               {#if log.error}
                                 <p class="mt-1 text-error">{log.error}</p>

@@ -2,6 +2,7 @@ import { drizzle, DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, eq, gte, desc, or, sql } from 'drizzle-orm';
 import { Resend } from 'resend';
 import * as schema from '../db/schema';
+import { escapeHtml } from './utils';
 import type { Env } from './auth';
 
 interface NewsletterPost {
@@ -298,17 +299,6 @@ export function generateNewsletterHTML(posts: NewsletterPost[], frontendUrl: str
     </body>
     </html>
   `;
-}
-
-function escapeHtml(text: string): string {
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  };
-  return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
 }
 
 function chunkArray<T>(array: T[], size: number): T[][] {

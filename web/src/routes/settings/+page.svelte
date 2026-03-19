@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { useSession, type CustomUser } from '$lib/auth';
   import { getUser, updateNewsletterPreference, type UserProfile } from '$lib/users';
-  import { getMyFeeds, createFeed, deleteFeed, type Feed } from '$lib/feeds';
+  import { getMyFeeds, createFeed, deleteFeed, type Feed, type FeedType } from '$lib/feeds';
 
   const session = useSession();
   const user = $derived($session.data?.user as CustomUser | undefined);
@@ -18,6 +18,8 @@
   let feedsLoading = $state(false);
   let newFeedName = $state('');
   let newFeedAutoPublish = $state(false);
+  let newFeedType = $state<FeedType>('email');
+  let newFeedSourceUrl = $state('');
   let creatingFeed = $state(false);
   let copiedFeedId = $state<string | null>(null);
 
@@ -62,11 +64,22 @@
 
   async function handleCreateFeed() {
     if (!newFeedName.trim() || creatingFeed) return;
+    if (newFeedType !== 'email' && !newFeedSourceUrl.trim()) {
+      error = 'URL es requerida para feeds RSS y Blog';
+      return;
+    }
     creatingFeed = true;
     try {
-      await createFeed(newFeedName.trim(), newFeedAutoPublish);
+      await createFeed(
+        newFeedName.trim(),
+        newFeedAutoPublish,
+        newFeedType,
+        newFeedType !== 'email' ? newFeedSourceUrl.trim() : undefined
+      );
       newFeedName = '';
       newFeedAutoPublish = false;
+      newFeedType = 'email';
+      newFeedSourceUrl = '';
       await loadFeeds();
     } catch (err: any) {
       error = err?.message || 'Error al crear feed';
@@ -84,8 +97,9 @@
     }
   }
 
-  function copyEmail(feed: Feed) {
-    navigator.clipboard.writeText(feed.email);
+  function copyFeedIdentifier(feed: Feed) {
+    const text = feed.type === 'email' ? feed.email! : feed.sourceUrl!;
+    navigator.clipboard.writeText(text);
     copiedFeedId = feed.id;
     setTimeout(() => (copiedFeedId = null), 2000);
   }
@@ -182,28 +196,48 @@
         </div>
 
         <p class="text-sm text-muted-foreground mb-4">
-          Crea direcciones email para suscribirte a newsletters externos. Un agente AI procesara los emails y publicara contenido relevante.
+          Agrega fuentes de contenido: newsletters por email, feeds RSS, o blogs HTML que un agente AI procesara.
         </p>
 
         <!-- Create feed form -->
-        <div class="flex flex-col sm:flex-row gap-2 mb-4">
-          <input
-            type="text"
-            bind:value={newFeedName}
-            placeholder="Nombre del feed..."
-            class="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-          />
-          <label class="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-            <input type="checkbox" bind:checked={newFeedAutoPublish} class="rounded" />
-            Auto-publicar
-          </label>
-          <button
-            onclick={handleCreateFeed}
-            disabled={creatingFeed || !newFeedName.trim()}
-            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
-          >
-            {creatingFeed ? 'Creando...' : 'Crear feed'}
-          </button>
+        <div class="flex flex-col gap-2 mb-4">
+          <div class="flex flex-col sm:flex-row gap-2">
+            <select
+              bind:value={newFeedType}
+              class="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+            >
+              <option value="email">Email</option>
+              <option value="rss">RSS</option>
+              <option value="blog">Blog HTML</option>
+            </select>
+            <input
+              type="text"
+              bind:value={newFeedName}
+              placeholder="Nombre del feed..."
+              class="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
+          {#if newFeedType !== 'email'}
+            <input
+              type="url"
+              bind:value={newFeedSourceUrl}
+              placeholder={newFeedType === 'rss' ? 'URL del feed RSS...' : 'URL del blog...'}
+              class="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+            />
+          {/if}
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-2 text-sm text-muted-foreground">
+              <input type="checkbox" bind:checked={newFeedAutoPublish} class="rounded" />
+              Auto-publicar
+            </label>
+            <button
+              onclick={handleCreateFeed}
+              disabled={creatingFeed || !newFeedName.trim()}
+              class="ml-auto px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
+            >
+              {creatingFeed ? 'Creando...' : 'Crear feed'}
+            </button>
+          </div>
         </div>
 
         <!-- Feeds list -->
@@ -216,11 +250,16 @@
             {#each feeds as feed (feed.id)}
               <div class="border border-border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-2">
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-foreground">{feed.name}</p>
+                  <div class="flex items-center gap-2">
+                    <p class="text-sm font-medium text-foreground">{feed.name}</p>
+                    <span class="text-[10px] uppercase font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{feed.type}</span>
+                  </div>
                   <div class="flex items-center gap-2 mt-1">
-                    <code class="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded truncate">{feed.email}</code>
+                    <code class="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded truncate">
+                      {feed.type === 'email' ? feed.email : feed.sourceUrl}
+                    </code>
                     <button
-                      onclick={() => copyEmail(feed)}
+                      onclick={() => copyFeedIdentifier(feed)}
                       class="text-xs text-accent hover:underline shrink-0"
                     >
                       {copiedFeedId === feed.id ? 'Copiado' : 'Copiar'}

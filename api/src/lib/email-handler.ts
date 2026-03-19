@@ -4,6 +4,7 @@ import PostalMime from 'postal-mime';
 import * as schema from '../db/schema';
 import { generateId } from './utils';
 import { runFeedAgent } from './feed-agent';
+import { extractLinks, extractLinksFromText } from './link-utils';
 import type { Env } from './auth';
 
 export async function handleIncomingEmail(
@@ -19,13 +20,13 @@ export async function handleIncomingEmail(
     const match = to.match(/^feed-([a-f0-9]+)@/i);
     if (!match) return;
 
-    const emailHash = match[1];
+    const hash = match[1];
 
     // Find feed
     const [feed] = await db
       .select()
       .from(schema.feeds)
-      .where(and(eq(schema.feeds.emailHash, emailHash), eq(schema.feeds.isActive, true)))
+      .where(and(eq(schema.feeds.hash, hash), eq(schema.feeds.isActive, true)))
       .limit(1);
 
     if (!feed) return;
@@ -48,8 +49,8 @@ export async function handleIncomingEmail(
       await db.insert(schema.feedLogs).values({
         id: generateId(),
         feedId: feed.id,
-        emailSubject: message.headers.get('subject') || null,
-        emailFrom: message.from,
+        subject: message.headers.get('subject') || null,
+        source: message.from,
         status: 'rate_limited',
         createdAt: new Date(),
       });
@@ -81,8 +82,8 @@ export async function handleIncomingEmail(
       await db.insert(schema.feedLogs).values({
         id: generateId(),
         feedId: feed.id,
-        emailSubject: parsed.subject || null,
-        emailFrom: message.from,
+        subject: parsed.subject || null,
+        source: message.from,
         rawBody: null,
         status: 'completed',
         createdAt: new Date(),
@@ -95,8 +96,8 @@ export async function handleIncomingEmail(
     await db.insert(schema.feedLogs).values({
       id: logId,
       feedId: feed.id,
-      emailSubject: parsed.subject || null,
-      emailFrom: message.from,
+      subject: parsed.subject || null,
+      source: message.from,
       rawBody,
       status: 'processing',
       createdAt: new Date(),
@@ -118,60 +119,3 @@ export async function handleIncomingEmail(
   }
 }
 
-export function extractLinks(html: string): string[] {
-  const seen = new Set<string>();
-  const links: string[] = [];
-
-  const hrefRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
-  let match;
-
-  while ((match = hrefRegex.exec(html)) !== null) {
-    const url = match[1];
-    if (!url.startsWith('https://')) continue;
-    if (seen.has(url)) continue;
-    if (isTrackingOrUnsubscribe(url)) continue;
-    seen.add(url);
-    links.push(url);
-  }
-
-  return links;
-}
-
-export function extractLinksFromText(text: string): string[] {
-  const seen = new Set<string>();
-  const links: string[] = [];
-  const urlRegex = /https?:\/\/[^\s<>"')\]]+/gi;
-  let match;
-
-  while ((match = urlRegex.exec(text)) !== null) {
-    const url = match[0].replace(/[.,;:!?]+$/, '');
-    if (!url.startsWith('https://')) continue;
-    if (seen.has(url)) continue;
-    if (isTrackingOrUnsubscribe(url)) continue;
-    seen.add(url);
-    links.push(url);
-  }
-
-  return links;
-}
-
-function isTrackingOrUnsubscribe(url: string): boolean {
-  const lower = url.toLowerCase();
-  const patterns = [
-    'unsubscribe',
-    'manage-preferences',
-    'email-preferences',
-    'opt-out',
-    'tracking',
-    'click.convertkit',
-    'click.mailchimp',
-    'list-manage.com',
-    'email.mg.',
-    'sendgrid.net',
-    'ct.sendgrid',
-    'mandrillapp.com',
-    'mailgun.org',
-    'link.mail.',
-  ];
-  return patterns.some((p) => lower.includes(p));
-}

@@ -1,9 +1,13 @@
 import { apiFetch } from './api';
 
+export type FeedType = 'email' | 'rss' | 'blog';
+
 export interface Feed {
   id: string;
   name: string;
-  email: string;
+  type: FeedType;
+  email: string | null;
+  sourceUrl: string | null;
   autoPublish: boolean;
   isActive: boolean;
   lastProcessedAt: string | null;
@@ -12,8 +16,8 @@ export interface Feed {
 
 export interface FeedLog {
   id: string;
-  emailSubject: string | null;
-  emailFrom: string | null;
+  subject: string | null;
+  source: string | null;
   status: 'processing' | 'completed' | 'error' | 'rate_limited';
   error: string | null;
   createdAt: string;
@@ -32,10 +36,15 @@ export async function getMyFeeds(): Promise<{ feeds: Feed[] }> {
   return apiFetch('/api/feeds');
 }
 
-export async function createFeed(name: string, autoPublish: boolean): Promise<Feed> {
+export async function createFeed(
+  name: string,
+  autoPublish: boolean,
+  type: FeedType = 'email',
+  sourceUrl?: string
+): Promise<Feed> {
   return apiFetch('/api/feeds', {
     method: 'POST',
-    body: JSON.stringify({ name, autoPublish }),
+    body: JSON.stringify({ name, autoPublish, type, sourceUrl }),
   });
 }
 

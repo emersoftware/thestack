@@ -115,7 +115,9 @@ export async function sendNewsletter(sendId?: string): Promise<NewsletterResult 
 export interface AdminFeed {
   id: string;
   name: string;
-  email: string;
+  type: 'email' | 'rss' | 'blog';
+  email: string | null;
+  sourceUrl: string | null;
   autoPublish: boolean;
   isActive: boolean;
   lastProcessedAt: string | null;

@@ -16,6 +16,8 @@ import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
 import { sendWeeklyNewsletter, createWeeklyDraft } from './lib/newsletter';
 import { handleIncomingEmail } from './lib/email-handler';
+import { fetchAndProcessRssFeeds } from './lib/rss-fetcher';
+import { fetchAndProcessBlogFeeds } from './lib/blog-fetcher';
 import type { Env } from './lib/auth';
 import { sessionMiddleware, type AuthVariables } from './middleware/auth';
 
@@ -167,6 +169,20 @@ export default {
       } catch (error) {
         console.error('[Cron] Error creating newsletter draft:', error);
       }
+    }
+
+    // RSS and blog feed check - runs daily at 12:00 UTC (9:00 Chile summer / 8:00 Chile winter)
+    // Use ctx.waitUntil to avoid timeout — feed processing involves external HTTP + AI calls
+    if (event.cron === '0 12 * * *') {
+      console.log('[Cron] Checking RSS and blog feeds...');
+      ctx.waitUntil(
+        Promise.all([
+          fetchAndProcessRssFeeds(env),
+          fetchAndProcessBlogFeeds(env),
+        ])
+          .then(() => console.log('[Cron] Feed check completed'))
+          .catch((error) => console.error('[Cron] Error processing feeds:', error))
+      );
     }
 
     // Weekly newsletter - runs Monday at 18:00 UTC (15:00 Chile summer / 14:00 Chile winter)

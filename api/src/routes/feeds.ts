@@ -4,14 +4,19 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
-import { generateId, calculateHNScore } from '../lib/utils';
+import { generateId, calculateHNScore, FEED_TYPES } from '../lib/utils';
 import { getPublishedTodayCount, isOverDailyLimit, RATE_LIMIT_ERROR } from '../lib/rate-limit';
 import { requireAuth, requireVerifiedEmail, type AuthVariables, type AuthUser } from '../middleware/auth';
 
 const createFeedSchema = z.object({
   name: z.string().min(1, 'Nombre es requerido').max(100, 'Nombre muy largo (max 100)'),
   autoPublish: z.boolean().optional().default(false),
-});
+  type: z.enum(FEED_TYPES).optional().default('email'),
+  sourceUrl: z.string().url('URL inválida').optional(),
+}).refine(
+  (data) => data.type === 'email' || data.sourceUrl,
+  { message: 'URL es requerida para feeds RSS y Blog', path: ['sourceUrl'] }
+);
 
 const updateFeedSchema = z.object({
   name: z.string().min(1, 'Nombre es requerido').max(100, 'Nombre muy largo (max 100)').optional(),
@@ -21,7 +26,7 @@ const updateFeedSchema = z.object({
 
 const feeds = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
-function generateEmailHash(): string {
+function generateHash(): string {
   const bytes = new Uint8Array(12);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -43,7 +48,9 @@ feeds.get('/', requireAuth(), async (c) => {
       feeds: result.map((f) => ({
         id: f.id,
         name: f.name,
-        email: `feed-${f.emailHash}@thestack.cl`,
+        type: f.type,
+        email: f.type === 'email' ? `feed-${f.hash}@thestack.cl` : null,
+        sourceUrl: f.sourceUrl,
         autoPublish: f.autoPublish,
         isActive: f.isActive,
         lastProcessedAt: f.lastProcessedAt ? new Date(f.lastProcessedAt).toISOString() : null,
@@ -68,7 +75,7 @@ feeds.post('/', requireVerifiedEmail(), async (c) => {
       return c.json({ error: validation.error.issues[0].message }, 400);
     }
 
-    const { name, autoPublish } = validation.data;
+    const { name, autoPublish, type, sourceUrl } = validation.data;
 
     // Rate limit: max 3 active feeds for non-admins
     if (!user.isAdmin) {
@@ -84,13 +91,15 @@ feeds.post('/', requireVerifiedEmail(), async (c) => {
 
     const now = new Date();
     const id = generateId();
-    const emailHash = generateEmailHash();
+    const hash = generateHash();
 
     await db.insert(schema.feeds).values({
       id,
       userId: user.id,
       name: name.trim(),
-      emailHash,
+      hash,
+      type,
+      sourceUrl: sourceUrl || null,
       autoPublish,
       isActive: true,
       createdAt: now,
@@ -100,7 +109,9 @@ feeds.post('/', requireVerifiedEmail(), async (c) => {
     return c.json({
       id,
       name: name.trim(),
-      email: `feed-${emailHash}@thestack.cl`,
+      type,
+      email: type === 'email' ? `feed-${hash}@thestack.cl` : null,
+      sourceUrl: sourceUrl || null,
       autoPublish,
     }, 201);
   } catch (error) {
@@ -386,8 +397,8 @@ feeds.get('/:id/logs', requireAuth(), async (c) => {
     return c.json({
       logs: logs.map((l) => ({
         id: l.id,
-        emailSubject: l.emailSubject,
-        emailFrom: l.emailFrom,
+        subject: l.subject,
+        source: l.source,
         status: l.status,
         error: l.error,
         createdAt: new Date(l.createdAt).toISOString(),

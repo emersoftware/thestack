@@ -3,42 +3,64 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
-import { extractDomain, generateId, calculateHNScore } from './utils';
-import { getPublishedTodayCount, isOverDailyLimit } from './rate-limit';
-import { generateUniqueSlug } from './slug';
-import { Resend } from 'resend';
+import { generateId, escapeHtml, FEED_BOT_USER_AGENT } from './utils';
+import { createFeedPosts, sendPendingPostsNotification } from './post-creator';
 import type { Env } from './auth';
 
-export interface PublishAction {
-  title: string;
-  url: string;
-}
+import type { FeedPostEntry } from './post-creator';
+type PublishAction = FeedPostEntry;
 
 interface SkipAction {
   url: string;
   reason: string;
 }
 
-const SYSTEM_PROMPT = `You are a content curator for TheStack, a Latin American community for intellectually curious people.
+export const SYSTEM_PROMPT = `You are a content curator for TheStack, a Latin American community for intellectually curious people.
 
-TheStack is a feed for sharing things that spark intellectual curiosity — blog posts, tools, papers, side projects, interesting threads, news, meetups, job offers, and more. It is NOT limited to tech. Anything genuinely interesting is welcome: science, design, economics, philosophy, startups, open source, essays, research.
+## What is TheStack?
+A feed for sharing things that spark intellectual curiosity and drive the tech industry in Latin America. Think of it like Hacker News for Latam.
 
-What does NOT belong: politics, celebrity gossip, sports, TV news, generic landing pages, ads, tracking/unsubscribe links, or pages with no substantial content.
+## What belongs on TheStack?
+Blog posts, tools, papers, side projects, interesting threads, news, meetups, job offers — anything genuinely interesting. Not limited to tech: science, design, economics, philosophy, startups, open source, essays, research are all welcome.
 
-You receive links extracted from a newsletter. For each link:
-1. Fetch it to understand what it is.
-2. If it has genuinely interesting content worth sharing, use publish_post with a concise, descriptive title. Use the original title when possible. Do not editorialize, use ALL CAPS, or add hype words.
-3. If it is not worth sharing, use skip with a brief reason.
+The bar is: would a thoughtful, intellectually curious person find this genuinely interesting or learn something from it?
 
-Process ALL links. Be selective — only publish content that would spark curiosity in a thoughtful reader.`;
+## What does NOT belong?
+- Politics, celebrity gossip, sports, TV news
+- Generic landing pages, product marketing pages, or company "about us" pages
+- Ads, tracking/unsubscribe links, pages with no substantial content
+- Product announcements that are just marketing ("we launched X!") without technical depth or insight
+- Pages that are primarily promotional rather than informative or educational
 
-function escapeHtml(text: string): string {
-  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-  return text.replace(/[&<>"']/g, (c) => entities[c] || c);
-}
+## How to evaluate content:
+1. Fetch each link to understand what it is.
+2. Ask yourself: does this teach something, share an insight, or present something genuinely novel? If yes, publish it. If it's just marketing, a product page, or shallow content, skip it.
+3. When publishing, use the original title. Do not editorialize, use ALL CAPS, or add hype words. If the original title is clickbait, rewrite it to be descriptive.
+4. When skipping, give a brief reason.
+
+## Examples of good content:
+- A blog post explaining how a company solved a hard technical problem
+- A research paper or essay with original thinking
+- An open source tool with a clear use case
+- A deep dive into an industry trend with data or analysis
+
+## Examples of content to SKIP:
+- "Meet our new feature X" (pure product marketing)
+- "Company Y raises $10M" (unless there's real insight into the business)
+- A landing page for a product with no blog content
+- Navigation links, contact pages, "about us" pages
+- Changelog or release notes without interesting technical context
+
+Process ALL links. Be highly selective — quality over quantity.
+
+## Available tools
+You have three tools:
+- **fetch_url**: Fetches a URL and returns its text content. ALWAYS use this to read each link before deciding — never publish or skip without reading the content first.
+- **publish_post**: Marks a link as worth publishing. Provide a concise title and the URL.
+- **skip**: Marks a link as not worth publishing. Provide the URL and a brief reason.`;
 
 export function generatePendingEmailHtml(
   userName: string,
@@ -132,6 +154,19 @@ export function generatePendingEmailHtml(
   `;
 }
 
+export const NEWSLETTER_TASK_PROMPT = `## Your task
+You will receive a list of links extracted from a newsletter. For each link:
+1. Use fetch_url to read its content — NEVER decide without reading first.
+2. Based on the content, use publish_post or skip.
+Process every link in the list.`;
+
+export const BLOG_TASK_PROMPT = `## Your task
+You will receive the text content of a blog page. Your job:
+1. Find URLs in the text that look like blog post entries (not navigation, footer, contact, or "about" links).
+2. For each blog post URL you find, use fetch_url to read the actual content.
+3. Based on the content you read, use publish_post if it has substance — technical insights, interesting stories, useful knowledge. Use skip only for pure marketing fluff, landing pages, or pages with no real content.
+When in doubt, publish — the user will review pending posts and can reject what doesn't fit.`;
+
 export async function runFeedAgent(
   links: string[],
   feed: Feed,
@@ -148,7 +183,7 @@ export async function runFeedAgent(
     async ({ url }) => {
       try {
         const response = await fetch(url, {
-          headers: { 'User-Agent': 'TheStack-FeedBot/1.0' },
+          headers: { 'User-Agent': FEED_BOT_USER_AGENT },
           redirect: 'follow',
         });
 
@@ -173,7 +208,7 @@ export async function runFeedAgent(
     },
     {
       name: 'fetch_url',
-      description: 'Fetch a URL and extract its main text content. Use this to read articles and determine if they are worth publishing.',
+      description: 'Fetch a URL and extract its text content. ALWAYS use this to read each link before deciding to publish or skip — never decide without reading the content first.',
       schema: z.object({ url: z.string().describe('The URL to fetch') }),
     }
   );
@@ -211,24 +246,26 @@ export async function runFeedAgent(
   const tools = [fetchUrlTool, publishPostTool, skipTool];
 
   const model = new ChatGoogle({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     apiKey: env.GOOGLE_API_KEY,
-    temperature: 0.3,
   }).bindTools(tools);
 
-  // Run agent loop
+  // Build system prompt with source-specific instructions
+  let systemPrompt = SYSTEM_PROMPT;
   let userMessage: string;
+
   if (links.length > 0) {
-    const linksText = links.map((l, i) => `${i + 1}. ${l}`).join('\n');
-    userMessage = `Aqui estan los links extraidos de un newsletter. Procesa cada uno:\n\n${linksText}`;
+    systemPrompt += '\n\n' + NEWSLETTER_TASK_PROMPT;
+    userMessage = links.map((l, i) => `${i + 1}. ${l}`).join('\n');
   } else if (rawBody) {
-    userMessage = `No pude extraer links del email. Aqui esta el contenido completo del email. Extrae las URLs que encuentres, visita las que parezcan relevantes, y usa publish_post o skip segun corresponda:\n\n${rawBody}`;
+    systemPrompt += '\n\n' + BLOG_TASK_PROMPT;
+    userMessage = rawBody;
   } else {
     return;
   }
 
   const messages: any[] = [
-    new SystemMessage(SYSTEM_PROMPT),
+    new SystemMessage(systemPrompt),
     new HumanMessage(userMessage),
   ];
 
@@ -262,104 +299,7 @@ export async function runFeedAgent(
   }
 
   // Post-processing: create posts for each publish action
-  let published = 0;
-  let pendingByRateLimit = 0;
-  let skipped = skipActions.length;
-
-  // Check rate limit once before the loop, track locally
-  let publishedTodayCount = feed.autoPublish
-    ? await getPublishedTodayCount(db, feed.userId)
-    : 0;
-
-  for (const action of publishActions) {
-    try {
-      // Check for duplicate URL
-      const [existing] = await db
-        .select({ id: schema.posts.id })
-        .from(schema.posts)
-        .where(eq(schema.posts.url, action.url))
-        .limit(1);
-
-      if (existing) {
-        skipped++;
-        continue;
-      }
-
-      const domain = extractDomain(action.url);
-      if (!domain) {
-        skipped++;
-        continue;
-      }
-
-      const now = new Date();
-      const isAutoPublish = feed.autoPublish;
-      const rateLimitReached = isAutoPublish && isOverDailyLimit(publishedTodayCount);
-
-      if (rateLimitReached) {
-        console.log(`[Feed Agent] Rate limit reached for user ${feed.userId}, creating as pending`);
-        pendingByRateLimit++;
-      }
-
-      const slug = await generateUniqueSlug(db, action.title);
-      const postId = generateId();
-      const shouldPublish = isAutoPublish && !rateLimitReached;
-      const initialScore = shouldPublish ? calculateHNScore(1, now) : 0;
-
-      if (shouldPublish) {
-        await db.batch([
-          db.insert(schema.posts).values({
-            id: postId,
-            title: action.title,
-            slug,
-            url: action.url,
-            domain,
-            authorId: feed.userId,
-            upvotesCount: 1,
-            score: initialScore,
-            isDeleted: false,
-            source: 'feed',
-            feedId: feed.id,
-            status: 'published',
-            publishedAt: now,
-            createdAt: now,
-            updatedAt: now,
-          }),
-          db.insert(schema.postUpvotes).values({
-            id: generateId(),
-            postId,
-            userId: feed.userId,
-            createdAt: now,
-          }),
-          db.update(schema.users)
-            .set({ karma: sql`${schema.users.karma} + 1` })
-            .where(eq(schema.users.id, feed.userId)),
-        ]);
-      } else {
-        await db.insert(schema.posts).values({
-          id: postId,
-          title: action.title,
-          slug,
-          url: action.url,
-          domain,
-          authorId: feed.userId,
-          upvotesCount: 0,
-          score: 0,
-          isDeleted: false,
-          source: 'feed',
-          feedId: feed.id,
-          status: 'pending',
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-
-      published++;
-      if (shouldPublish) publishedTodayCount++;
-    } catch (err) {
-      console.error(`[Feed Agent] Error publishing ${action.url}:`, err);
-      skipped++;
-    }
-  }
+  const result = await createFeedPosts(db, feed, publishActions);
 
   // Update feed log and feed lastProcessedAt atomically
   const now = new Date();
@@ -373,38 +313,7 @@ export async function runFeedAgent(
   ]);
 
   // Send email notification for pending posts
-  const hasPendingPosts = (published > 0 && !feed.autoPublish) || pendingByRateLimit > 0;
-  if (hasPendingPosts) {
-    try {
-      const [user] = await db
-        .select({
-          email: schema.users.email,
-          name: schema.users.name,
-          username: schema.users.username,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, feed.userId))
-        .limit(1);
-
-      if (user?.email) {
-        const postTitles = publishActions.map((a) => a.title);
-        const html = generatePendingEmailHtml(
-          user.name || user.username,
-          feed.name,
-          postTitles,
-          user.username,
-        );
-
-        const resend = new Resend(env.RESEND_API_KEY);
-        await resend.emails.send({
-          from: 'The Stack <noreply@thestack.cl>',
-          to: user.email,
-          subject: `Tienes ${published} ${published === 1 ? 'post pendiente' : 'posts pendientes'} del feed "${feed.name}"`,
-          html,
-        });
-      }
-    } catch (err) {
-      console.error('[Feed Agent] Error sending pending notification email:', err);
-    }
+  if (result.pendingTitles.length > 0) {
+    await sendPendingPostsNotification(db, env, feed, result.pendingTitles);
   }
 }

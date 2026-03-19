@@ -84,7 +84,9 @@ export const feeds = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    emailHash: text('email_hash').notNull().unique(),
+    hash: text('hash').notNull().unique(),
+    type: text('type').notNull().default('email'),
+    sourceUrl: text('source_url'),
     autoPublish: integer('auto_publish', { mode: 'boolean' }).default(false).notNull(),
     isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
     lastProcessedAt: integer('last_processed_at', { mode: 'timestamp' }),
@@ -93,7 +95,8 @@ export const feeds = sqliteTable(
   },
   (table) => [
     index('idx_feeds_user').on(table.userId),
-    uniqueIndex('idx_feeds_email_hash').on(table.emailHash),
+    uniqueIndex('idx_feeds_hash').on(table.hash),
+    index('idx_feeds_type').on(table.type),
   ]
 );
 
@@ -104,8 +107,8 @@ export const feedLogs = sqliteTable(
     feedId: text('feed_id')
       .notNull()
       .references(() => feeds.id, { onDelete: 'cascade' }),
-    emailSubject: text('email_subject'),
-    emailFrom: text('email_from'),
+    subject: text('subject'),
+    source: text('source'),
     rawBody: text('raw_body'),
     status: text('status').notNull().default('processing'),
     error: text('error'),
