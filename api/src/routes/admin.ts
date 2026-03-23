@@ -5,7 +5,8 @@ import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
 import { sendWeeklyNewsletter, createWeeklyDraft, getWeeklySubject, getNextMondayAt18UTC, getNewsletterSubscribers } from '../lib/newsletter';
-import { generateSlug } from '../lib/utils';
+import { generateSlug, calculateHNScore } from '../lib/utils';
+import { getScoringConfig } from '../lib/scoring';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -1000,6 +1001,185 @@ admin.get('/analytics/link-clicks', async (c) => {
   } catch (error) {
     console.error('Link clicks analytics error:', error);
     return c.json({ error: 'Error' }, 500);
+  }
+});
+
+// ─── Scoring config ───
+
+interface ScoringBody {
+  gravity: number;
+  boost: number;
+  ageOffsetHours: number;
+  recalcWindowHours: number;
+}
+
+function validateScoringParams(body: ScoringBody): string | null {
+  if (body.gravity < 0.5 || body.gravity > 3.0) return 'Gravity debe estar entre 0.5 y 3.0';
+  if (body.boost < 0 || body.boost > 5.0) return 'Boost debe estar entre 0.0 y 5.0';
+  if (body.ageOffsetHours < 0.5 || body.ageOffsetHours > 10.0) return 'Age offset debe estar entre 0.5 y 10.0';
+  if (body.recalcWindowHours < 24 || body.recalcWindowHours > 720) return 'Ventana debe estar entre 24 y 720 horas';
+  return null;
+}
+
+// GET /admin/scoring - current config + top 50 posts
+admin.get('/scoring', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+
+  try {
+    const config = await getScoringConfig(db);
+
+    const topPosts = await db
+      .select({
+        id: schema.posts.id,
+        title: schema.posts.title,
+        upvotesCount: schema.posts.upvotesCount,
+        score: schema.posts.score,
+        publishedAt: schema.posts.publishedAt,
+        createdAt: schema.posts.createdAt,
+        authorUsername: schema.users.username,
+      })
+      .from(schema.posts)
+      .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
+      .where(and(eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published')))
+      .orderBy(desc(schema.posts.score))
+      .limit(50);
+
+    return c.json({
+      config,
+      posts: topPosts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        upvotesCount: p.upvotesCount,
+        currentScore: p.score,
+        publishedAt: p.publishedAt ? new Date(p.publishedAt).toISOString() : null,
+        createdAt: new Date(p.createdAt).toISOString(),
+        authorUsername: p.authorUsername || 'unknown',
+      })),
+    });
+  } catch (error) {
+    console.error('Error al obtener configuracion de scoring:', error);
+    return c.json({ error: 'Error al obtener configuracion de scoring' }, 500);
+  }
+});
+
+// POST /admin/scoring/simulate - simulate with new params
+admin.post('/scoring/simulate', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+
+  try {
+    const body = await c.req.json<ScoringBody>();
+    const validationError = validateScoringParams(body);
+    if (validationError) return c.json({ error: validationError }, 400);
+
+    // Get ALL published non-deleted posts to properly compute rankings
+    const allPosts = await db
+      .select({
+        id: schema.posts.id,
+        title: schema.posts.title,
+        upvotesCount: schema.posts.upvotesCount,
+        score: schema.posts.score,
+        publishedAt: schema.posts.publishedAt,
+        createdAt: schema.posts.createdAt,
+        authorUsername: schema.users.username,
+      })
+      .from(schema.posts)
+      .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
+      .where(and(eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published')))
+      .orderBy(desc(schema.posts.score));
+
+    const newParams = { gravity: body.gravity, boost: body.boost, ageOffsetHours: body.ageOffsetHours };
+
+    const postsWithNewScores = allPosts.map((p, idx) => ({
+      id: p.id,
+      title: p.title,
+      upvotesCount: p.upvotesCount,
+      currentScore: p.score,
+      currentRank: idx + 1,
+      newScore: calculateHNScore(p.upvotesCount, p.publishedAt ?? p.createdAt, newParams),
+      publishedAt: p.publishedAt ? new Date(p.publishedAt).toISOString() : null,
+      createdAt: new Date(p.createdAt).toISOString(),
+      authorUsername: p.authorUsername || 'unknown',
+    }));
+
+    // Sort by new score descending
+    postsWithNewScores.sort((a, b) => b.newScore - a.newScore);
+
+    // Return top 50 with rank change info
+    const result = postsWithNewScores.slice(0, 50).map((p, idx) => ({
+      ...p,
+      newRank: idx + 1,
+      rankChange: p.currentRank - (idx + 1),
+    }));
+
+    return c.json({ posts: result, totalPosts: allPosts.length });
+  } catch (error) {
+    console.error('Error al simular scoring:', error);
+    return c.json({ error: 'Error al simular scoring' }, 500);
+  }
+});
+
+// POST /admin/scoring/apply - save config + recalculate ALL scores
+admin.post('/scoring/apply', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+
+  try {
+    const body = await c.req.json<ScoringBody>();
+    const validationError = validateScoringParams(body);
+    if (validationError) return c.json({ error: validationError }, 400);
+
+    const now = new Date();
+
+    // Upsert config + fetch posts in parallel
+    const [, allPosts] = await Promise.all([
+      db
+        .insert(schema.scoringConfig)
+        .values({
+          id: 'default',
+          gravity: body.gravity,
+          boost: body.boost,
+          ageOffsetHours: body.ageOffsetHours,
+          recalcWindowHours: body.recalcWindowHours,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: schema.scoringConfig.id,
+          set: {
+            gravity: body.gravity,
+            boost: body.boost,
+            ageOffsetHours: body.ageOffsetHours,
+            recalcWindowHours: body.recalcWindowHours,
+            updatedAt: now,
+          },
+        }),
+      db
+        .select({
+          id: schema.posts.id,
+          upvotesCount: schema.posts.upvotesCount,
+          publishedAt: schema.posts.publishedAt,
+          createdAt: schema.posts.createdAt,
+        })
+        .from(schema.posts)
+        .where(and(eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published'))),
+    ]);
+
+    // Recalculate ALL published post scores in batch
+    const newParams = { gravity: body.gravity, boost: body.boost, ageOffsetHours: body.ageOffsetHours };
+
+    const updates = allPosts.map((post) => {
+      const newScore = calculateHNScore(post.upvotesCount, post.publishedAt ?? post.createdAt, newParams);
+      return db.update(schema.posts).set({ score: newScore }).where(eq(schema.posts.id, post.id));
+    });
+
+    if (updates.length > 0) {
+      await db.batch(updates as [typeof updates[0], ...typeof updates]);
+    }
+
+    console.log(`[Admin] Scoring config applied: gravity=${body.gravity}, boost=${body.boost}, offset=${body.ageOffsetHours}, window=${body.recalcWindowHours}. Updated ${allPosts.length} posts.`);
+
+    return c.json({ success: true, updated: allPosts.length });
+  } catch (error) {
+    console.error('Error al aplicar configuracion de scoring:', error);
+    return c.json({ error: 'Error al aplicar configuracion de scoring' }, 500);
   }
 });
 

@@ -212,3 +212,49 @@ export async function getLinkClicksAnalytics(start: string, end: string): Promis
 }> {
   return apiFetch(`/api/admin/analytics/link-clicks${dateParams(start, end)}`);
 }
+
+// ─── Scoring ───
+
+export interface ScoringConfigData {
+  gravity: number;
+  boost: number;
+  ageOffsetHours: number;
+  recalcWindowHours: number;
+}
+
+export interface ScoringPost {
+  id: string;
+  title: string;
+  upvotesCount: number;
+  currentScore: number;
+  publishedAt: string | null;
+  createdAt: string;
+  authorUsername: string;
+}
+
+export interface SimulatedPost extends ScoringPost {
+  newScore: number;
+  currentRank: number;
+  newRank: number;
+  rankChange: number;
+}
+
+export async function getScoringConfig(): Promise<{ config: ScoringConfigData; posts: ScoringPost[] }> {
+  return apiFetch('/api/admin/scoring');
+}
+
+export async function simulateScoring(params: ScoringConfigData): Promise<{ posts: SimulatedPost[]; totalPosts: number }> {
+  return apiFetch('/api/admin/scoring/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}
+
+export async function applyScoring(params: ScoringConfigData): Promise<{ success: boolean; updated: number }> {
+  return apiFetch('/api/admin/scoring/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}

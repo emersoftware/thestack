@@ -33,13 +33,17 @@
     type NewsletterStatus,
     type NewsletterSendItem,
   } from '$lib/admin';
-  import { getAdminFeeds, deleteAdminFeed, retryFeedLog, type AdminFeed } from '$lib/admin';
+  import {
+    getAdminFeeds, deleteAdminFeed, retryFeedLog, type AdminFeed,
+    getScoringConfig as fetchScoringConfig, simulateScoring, applyScoring,
+    type ScoringConfigData, type ScoringPost, type SimulatedPost,
+  } from '$lib/admin';
   import { getFeedLogs, type FeedLog } from '$lib/feeds';
 
   let { data } = $props();
   const user = data.user!;
 
-  let activeTab = $state<'analytics' | 'users' | 'posts' | 'newsletter' | 'feeds'>('analytics');
+  let activeTab = $state<'analytics' | 'users' | 'posts' | 'newsletter' | 'feeds' | 'scoring'>('analytics');
   let stats = $state<AdminStats | null>(null);
   let users = $state<AdminUser[]>([]);
   let posts = $state<AdminPost[]>([]);
@@ -68,6 +72,22 @@
   let feedLogsLoading = $state(false);
   let selectedAdminFeedId = $state<string | null>(null);
   let retryingLogId = $state<string | null>(null);
+
+  // Scoring state
+  let scoringLoading = $state(false);
+  let scoringTabLoaded = $state(false);
+  let scoringConfig = $state<ScoringConfigData | null>(null);
+  let scoringPosts = $state<ScoringPost[]>([]);
+  let simulatedPosts = $state<SimulatedPost[] | null>(null);
+  let simulatedTotalPosts = $state(0);
+  let simulating = $state(false);
+  let applying = $state(false);
+  let showApplyModal = $state(false);
+  let applyResult = $state<{ updated: number } | null>(null);
+  let editGravity = $state(1.5);
+  let editBoost = $state(1.0);
+  let editAgeOffset = $state(2.0);
+  let editRecalcWindow = $state(720);
 
   // Analytics state
   const now = new Date();
@@ -291,6 +311,87 @@
     }
   }
 
+  async function loadScoringTab() {
+    scoringLoading = true;
+    try {
+      const data = await fetchScoringConfig();
+      scoringConfig = data.config;
+      scoringPosts = data.posts;
+      editGravity = data.config.gravity;
+      editBoost = data.config.boost;
+      editAgeOffset = data.config.ageOffsetHours;
+      editRecalcWindow = data.config.recalcWindowHours;
+    } catch (err) {
+      console.error('Error loading scoring tab:', err);
+    } finally {
+      scoringLoading = false;
+      scoringTabLoaded = true;
+    }
+  }
+
+  async function handleSimulate() {
+    simulating = true;
+    simulatedPosts = null;
+    try {
+      const result = await simulateScoring({
+        gravity: editGravity,
+        boost: editBoost,
+        ageOffsetHours: editAgeOffset,
+        recalcWindowHours: editRecalcWindow,
+      });
+      simulatedPosts = result.posts;
+      simulatedTotalPosts = result.totalPosts;
+    } catch (err) {
+      console.error('Error simulating:', err);
+    } finally {
+      simulating = false;
+    }
+  }
+
+  async function handleApplyScoring() {
+    applying = true;
+    applyResult = null;
+    try {
+      const result = await applyScoring({
+        gravity: editGravity,
+        boost: editBoost,
+        ageOffsetHours: editAgeOffset,
+        recalcWindowHours: editRecalcWindow,
+      });
+      applyResult = { updated: result.updated };
+      scoringConfig = {
+        gravity: editGravity,
+        boost: editBoost,
+        ageOffsetHours: editAgeOffset,
+        recalcWindowHours: editRecalcWindow,
+      };
+      // Reload scoring data
+      await loadScoringTab();
+      simulatedPosts = null;
+    } catch (err) {
+      console.error('Error applying scoring:', err);
+    } finally {
+      applying = false;
+    }
+  }
+
+  function humanizeAge(dateStr: string): string {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const hours = diffMs / (1000 * 60 * 60);
+    if (hours < 1) return `${Math.round(hours * 60)}m`;
+    if (hours < 24) return `${Math.round(hours)}h`;
+    const days = hours / 24;
+    if (days < 7) return `${Math.round(days)}d`;
+    if (days < 30) return `${Math.round(days / 7)}w`;
+    return `${Math.round(days / 30)}mo`;
+  }
+
+  $effect(() => {
+    if (activeTab === 'scoring' && !scoringTabLoaded) {
+      loadScoringTab();
+    }
+  });
+
   $effect(() => {
     if (activeTab === 'newsletter' && !nlTabLoaded) {
       loadNewsletterTab();
@@ -321,7 +422,7 @@
 
   <!-- Tabs -->
   <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border overflow-x-auto">
-    {#each ['analytics', 'users', 'posts', 'newsletter', 'feeds'] as tab}
+    {#each ['analytics', 'users', 'posts', 'newsletter', 'feeds', 'scoring'] as tab}
       <button
         onclick={() => (activeTab = tab as typeof activeTab)}
         class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
@@ -329,7 +430,7 @@
           ? 'text-foreground border-b-2 border-accent'
           : 'text-muted-foreground hover:text-foreground'}"
       >
-        {tab === 'analytics' ? 'Analytics' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : tab === 'newsletter' ? 'Newsletter' : 'Feeds'}
+        {tab === 'analytics' ? 'Analytics' : tab === 'users' ? 'Usuarios' : tab === 'posts' ? 'Posts' : tab === 'newsletter' ? 'Newsletter' : tab === 'feeds' ? 'Feeds' : 'Scoring'}
       </button>
     {/each}
   </div>
@@ -925,8 +1026,294 @@
         </div>
       {/if}
     {/if}
+
+    <!-- Scoring Tab -->
+    {#if activeTab === 'scoring'}
+      {#if scoringLoading && !scoringTabLoaded}
+        <p class="text-muted-foreground text-center py-8">Cargando scoring...</p>
+      {:else}
+        <!-- Current config info -->
+        {#if scoringConfig}
+          <div class="bg-card border border-border rounded-xl p-6 mb-4">
+            <h3 class="text-sm font-semibold text-foreground mb-1">Formula de ranking</h3>
+            <p class="text-xs text-muted-foreground mb-4 font-mono">score = (upvotes - 1 + boost) / (ageHours + offset)^gravity</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Gravity -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-muted-foreground">Gravity (decay)</label>
+                  <span class="text-xs text-muted-foreground">0.5 - 3.0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
+                    bind:value={editGravity}
+                    class="flex-1 accent-accent"
+                  />
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
+                    bind:value={editGravity}
+                    class="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm text-foreground text-center"
+                  />
+                </div>
+                <p class="text-[10px] text-muted-foreground mt-1">Mayor = posts decaen mas rapido. HN usa 1.8</p>
+              </div>
+
+              <!-- Boost -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-muted-foreground">Boost (visibilidad inicial)</label>
+                  <span class="text-xs text-muted-foreground">0.0 - 5.0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="5.0"
+                    step="0.1"
+                    bind:value={editBoost}
+                    class="flex-1 accent-accent"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="5.0"
+                    step="0.1"
+                    bind:value={editBoost}
+                    class="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm text-foreground text-center"
+                  />
+                </div>
+                <p class="text-[10px] text-muted-foreground mt-1">Se suma a upvotes. Da visibilidad inicial a posts nuevos</p>
+              </div>
+
+              <!-- Age Offset -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-muted-foreground">Offset de edad (horas)</label>
+                  <span class="text-xs text-muted-foreground">0.5 - 10.0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="10.0"
+                    step="0.5"
+                    bind:value={editAgeOffset}
+                    class="flex-1 accent-accent"
+                  />
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="10.0"
+                    step="0.5"
+                    bind:value={editAgeOffset}
+                    class="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm text-foreground text-center"
+                  />
+                </div>
+                <p class="text-[10px] text-muted-foreground mt-1">Suaviza el ranking de posts muy nuevos</p>
+              </div>
+
+              <!-- Recalc Window -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-muted-foreground">Ventana de recalculo (horas)</label>
+                  <span class="text-xs text-muted-foreground">24 - 720</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="24"
+                    max="720"
+                    step="24"
+                    bind:value={editRecalcWindow}
+                    class="flex-1 accent-accent"
+                  />
+                  <input
+                    type="number"
+                    min="24"
+                    max="720"
+                    step="24"
+                    bind:value={editRecalcWindow}
+                    class="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm text-foreground text-center"
+                  />
+                </div>
+                <p class="text-[10px] text-muted-foreground mt-1">Posts mas viejos que esto no se recalculan en el cron. Actual: {scoringConfig.recalcWindowHours}h ({Math.round(scoringConfig.recalcWindowHours / 24)}d)</p>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-3 mt-6">
+              <button
+                onclick={handleSimulate}
+                disabled={simulating}
+                class="px-4 py-2 bg-card border border-accent text-accent rounded-lg text-sm font-medium hover:bg-accent/10 transition-colors disabled:opacity-50"
+              >
+                {simulating ? 'Simulando...' : 'Simular'}
+              </button>
+              <button
+                onclick={() => { showApplyModal = true; applyResult = null; }}
+                disabled={applying}
+                class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+              >
+                {applying ? 'Aplicando...' : 'Aplicar configuracion'}
+              </button>
+              {#if scoringConfig && (editGravity !== scoringConfig.gravity || editBoost !== scoringConfig.boost || editAgeOffset !== scoringConfig.ageOffsetHours || editRecalcWindow !== scoringConfig.recalcWindowHours)}
+                <span class="text-xs text-warning">Cambios sin aplicar</span>
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Simulation results -->
+        {#if simulatedPosts}
+          {@const changed = simulatedPosts.filter(p => p.rankChange !== 0).length}
+          <div class="bg-card border border-border rounded-xl p-6 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-foreground">Simulacion (Top 50 de {simulatedTotalPosts} posts)</h3>
+              <span class="text-xs text-muted-foreground">{changed} posts cambiaron de posicion</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-border">
+                    <th class="text-left py-2 text-foreground font-medium w-8">#</th>
+                    <th class="text-center py-2 text-foreground font-medium w-12">Cambio</th>
+                    <th class="text-left py-2 text-foreground font-medium">Titulo</th>
+                    <th class="text-right py-2 text-foreground font-medium w-10">Votos</th>
+                    <th class="text-right py-2 text-foreground font-medium w-14">Edad</th>
+                    <th class="text-right py-2 text-foreground font-medium w-32">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each simulatedPosts as p, i (p.id)}
+                    <tr class="border-b border-border last:border-0 {p.rankChange > 0 ? 'bg-success/5' : p.rankChange < 0 ? 'bg-error/5' : ''}">
+                      <td class="py-1.5 text-foreground font-mono">{p.newRank}</td>
+                      <td class="py-1.5 text-center">
+                        {#if p.rankChange > 0}
+                          <span class="text-success font-medium">+{p.rankChange}</span>
+                        {:else if p.rankChange < 0}
+                          <span class="text-error font-medium">{p.rankChange}</span>
+                        {:else}
+                          <span class="text-muted-foreground">=</span>
+                        {/if}
+                      </td>
+                      <td class="py-1.5 text-foreground truncate max-w-[250px]" title={p.title}>{p.title}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{p.upvotesCount}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{humanizeAge(p.publishedAt ?? p.createdAt)}</td>
+                      <td class="py-1.5 text-right font-mono">
+                        <span class="text-muted-foreground">{p.currentScore.toFixed(4)}</span>
+                        <span class="text-muted-foreground mx-1">→</span>
+                        <span class="text-foreground">{p.newScore.toFixed(4)}</span>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Current ranking (when no simulation) -->
+        {#if !simulatedPosts && scoringPosts.length > 0}
+          <div class="bg-card border border-border rounded-xl p-6">
+            <h3 class="text-sm font-semibold text-foreground mb-3">Ranking actual (Top 50)</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-border">
+                    <th class="text-left py-2 text-foreground font-medium w-8">#</th>
+                    <th class="text-left py-2 text-foreground font-medium">Titulo</th>
+                    <th class="text-left py-2 text-foreground font-medium w-20">Autor</th>
+                    <th class="text-right py-2 text-foreground font-medium w-10">Votos</th>
+                    <th class="text-right py-2 text-foreground font-medium w-14">Edad</th>
+                    <th class="text-right py-2 text-foreground font-medium w-20">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each scoringPosts as p, i (p.id)}
+                    <tr class="border-b border-border last:border-0">
+                      <td class="py-1.5 text-foreground font-mono">{i + 1}</td>
+                      <td class="py-1.5 text-foreground truncate max-w-[250px]" title={p.title}>{p.title}</td>
+                      <td class="py-1.5 text-muted-foreground">{p.authorUsername}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{p.upvotesCount}</td>
+                      <td class="py-1.5 text-right text-muted-foreground">{humanizeAge(p.publishedAt ?? p.createdAt)}</td>
+                      <td class="py-1.5 text-right text-foreground font-mono">{p.currentScore.toFixed(4)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/if}
+      {/if}
+    {/if}
   {/if}
 </div>
+
+<!-- Scoring Apply Confirmation Modal -->
+{#if showApplyModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-card border border-border rounded-xl p-6 max-w-md w-full">
+      {#if applyResult}
+        <div class="text-center">
+          <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
+            <span class="text-success text-xl">OK</span>
+          </div>
+          <h3 class="text-lg font-semibold text-foreground mb-2">Configuracion aplicada</h3>
+          <p class="text-sm text-muted-foreground mb-6">
+            Se recalcularon los scores de {applyResult.updated} posts.
+          </p>
+          <button
+            onclick={() => { showApplyModal = false; applyResult = null; }}
+            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+          >
+            Cerrar
+          </button>
+        </div>
+      {:else if applying}
+        <div class="text-center">
+          <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span class="text-muted-foreground">...</span>
+          </div>
+          <h3 class="text-lg font-semibold text-foreground mb-2">Aplicando...</h3>
+          <p class="text-sm text-muted-foreground">Recalculando scores de todos los posts.</p>
+        </div>
+      {:else}
+        <h3 class="text-lg font-semibold text-foreground mb-2">Confirmar cambios</h3>
+        <p class="text-sm text-muted-foreground mb-4">
+          Esto guardara la nueva configuracion y recalculara los scores de TODOS los posts publicados.
+        </p>
+        <div class="bg-muted/30 rounded-lg p-3 mb-4 text-xs font-mono space-y-1">
+          <p>Gravity: {scoringConfig?.gravity} → <span class="text-foreground font-bold">{editGravity}</span></p>
+          <p>Boost: {scoringConfig?.boost} → <span class="text-foreground font-bold">{editBoost}</span></p>
+          <p>Offset: {scoringConfig?.ageOffsetHours}h → <span class="text-foreground font-bold">{editAgeOffset}h</span></p>
+          <p>Ventana: {scoringConfig?.recalcWindowHours}h → <span class="text-foreground font-bold">{editRecalcWindow}h</span></p>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button
+            onclick={() => (showApplyModal = false)}
+            class="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onclick={handleApplyScoring}
+            class="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+          >
+            Aplicar
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <!-- Newsletter Confirmation Modal -->
 {#if showNewsletterModal}

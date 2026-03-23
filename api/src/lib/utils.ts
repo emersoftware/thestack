@@ -32,19 +32,34 @@ export function isValidUrl(url: string): boolean {
 
 /**
  * calculate Hacker News-style ranking score
- * formula: (max(0, upvotes - 1) + BOOST) / (ageHours + 2)^GRAVITY
- * - BOOST gives new posts initial visibility
+ * formula: (max(0, upvotes - 1) + boost) / (ageHours + ageOffsetHours)^gravity
+ * - boost gives new posts initial visibility
  * - upvotes - 1 discounts author's auto-upvote
- * - posts decay over time (GRAVITY = 1.2 for small communities)
- * - +2 hours prevents division by zero and smooths early ranking
+ * - posts decay over time (gravity controls decay speed)
+ * - ageOffsetHours prevents division by zero and smooths early ranking
  */
-const GRAVITY = 1.2;
-const BOOST = 1.0;
+export interface ScoringParams {
+  gravity: number;
+  boost: number;
+  ageOffsetHours: number;
+}
+
+export const DEFAULT_SCORING_PARAMS: ScoringParams = {
+  gravity: 1.5,
+  boost: 1.0,
+  ageOffsetHours: 2.0,
+};
+
 const HOUR_IN_MS = 1000 * 60 * 60;
 
-export function calculateHNScore(upvotes: number, createdAt: Date): number {
+export function calculateHNScore(
+  upvotes: number,
+  createdAt: Date,
+  params: ScoringParams = DEFAULT_SCORING_PARAMS,
+): number {
   const ageInHours = (Date.now() - createdAt.getTime()) / HOUR_IN_MS;
-  const score = (Math.max(0, upvotes - 1) + BOOST) / Math.pow(ageInHours + 2, GRAVITY);
+  const score =
+    (Math.max(0, upvotes - 1) + params.boost) / Math.pow(ageInHours + params.ageOffsetHours, params.gravity);
   return score;
 }
 

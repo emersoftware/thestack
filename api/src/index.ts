@@ -14,6 +14,7 @@ import track from './routes/track';
 import feeds from './routes/feeds';
 import * as schema from './db/schema';
 import { calculateHNScore } from './lib/utils';
+import { getScoringConfig } from './lib/scoring';
 import { sendWeeklyNewsletter, createWeeklyDraft } from './lib/newsletter';
 import { handleIncomingEmail } from './lib/email-handler';
 import { fetchAndProcessRssFeeds } from './lib/rss-fetcher';
@@ -123,9 +124,11 @@ export default {
 
     // Score recalculation - runs every 10 minutes
     if (event.cron === '*/10 * * * *') {
-      const cutoffTime = new Date(Date.now() - 168 * 60 * 60 * 1000);
-
       try {
+        const config = await getScoringConfig(db);
+        const cutoffTime = new Date(Date.now() - config.recalcWindowHours * 60 * 60 * 1000);
+        const scoringParams = { gravity: config.gravity, boost: config.boost, ageOffsetHours: config.ageOffsetHours };
+
         const recentPosts = await db
           .select({
             id: schema.posts.id,
@@ -145,16 +148,16 @@ export default {
             )
           );
 
-        for (const post of recentPosts) {
-          const newScore = calculateHNScore(post.upvotesCount, post.publishedAt ?? post.createdAt);
+        const updates = recentPosts.map((post) => {
+          const newScore = calculateHNScore(post.upvotesCount, post.publishedAt ?? post.createdAt, scoringParams);
+          return db.update(schema.posts).set({ score: newScore }).where(eq(schema.posts.id, post.id));
+        });
 
-          await db
-            .update(schema.posts)
-            .set({ score: newScore })
-            .where(eq(schema.posts.id, post.id));
+        if (updates.length > 0) {
+          await db.batch(updates as [typeof updates[0], ...typeof updates]);
         }
 
-        console.log(`[Cron] Updated scores for ${recentPosts.length} posts`);
+        console.log(`[Cron] Updated scores for ${recentPosts.length} posts (gravity=${config.gravity}, window=${config.recalcWindowHours}h)`);
       } catch (error) {
         console.error('[Cron] Error updating scores:', error);
       }

@@ -294,6 +294,17 @@ export const newsletterOpens = sqliteTable(
   ]
 );
 
+export const scoringConfig = sqliteTable('scoring_config', {
+  id: text('id').primaryKey().default('default'),
+  gravity: real('gravity').notNull().default(1.5),
+  boost: real('boost').notNull().default(1.0),
+  ageOffsetHours: real('age_offset_hours').notNull().default(2.0),
+  recalcWindowHours: integer('recalc_window_hours').notNull().default(720),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type ScoringConfig = typeof scoringConfig.$inferSelect;
+
 export type Feed = typeof feeds.$inferSelect;
 export type NewFeed = typeof feeds.$inferInsert;
 export type FeedLog = typeof feedLogs.$inferSelect;
