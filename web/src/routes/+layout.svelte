@@ -44,7 +44,7 @@
 
 <div class="min-h-screen p-2 sm:p-3 bg-background flex flex-col">
   <Header user={data.user} />
-  <div class="flex-1">
+  <div class="flex-1 flex flex-col">
     {@render children()}
   </div>
 </div>
