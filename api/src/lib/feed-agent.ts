@@ -8,6 +8,7 @@ import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
 import { generateId, escapeHtml, FEED_BOT_USER_AGENT } from './utils';
 import { createFeedPosts, sendPendingPostsNotification } from './post-creator';
+import { cleanUrl } from './link-utils';
 import type { Env } from './auth';
 
 import type { FeedPostEntry } from './post-creator';
@@ -178,6 +179,9 @@ export async function runFeedAgent(
   const publishActions: PublishAction[] = [];
   const skipActions: SkipAction[] = [];
 
+  // Track resolved URLs: original URL -> final destination after redirects
+  const resolvedUrls = new Map<string, string>();
+
   // Define tools
   const fetchUrlTool = tool(
     async ({ url }) => {
@@ -189,6 +193,11 @@ export async function runFeedAgent(
 
         if (!response.ok) {
           return `Error fetching ${url}: HTTP ${response.status}`;
+        }
+
+        // Store the final URL after redirects
+        if (response.url && response.url !== url) {
+          resolvedUrls.set(url, cleanUrl(response.url));
         }
 
         const html = await response.text();
@@ -215,8 +224,10 @@ export async function runFeedAgent(
 
   const publishPostTool = tool(
     async ({ title, url }) => {
-      publishActions.push({ title, url });
-      return `Marked for publishing: "${title}" (${url})`;
+      // Use resolved URL if the original was a redirect/tracking URL
+      const finalUrl = resolvedUrls.get(url) || cleanUrl(url);
+      publishActions.push({ title, url: finalUrl });
+      return `Marked for publishing: "${title}" (${finalUrl})`;
     },
     {
       name: 'publish_post',
