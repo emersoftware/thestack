@@ -118,10 +118,12 @@
         />
         <span>·</span>
         <span>{getRelativeTime(post.createdAt)}</span>
-        <span>·</span>
-        <a href="/user/{post.author.username}" class="hover:text-foreground">
-          {post.author.username}
-        </a>
+        {#if post.author.showAuthor !== false}
+          <span>·</span>
+          <a href="/user/{post.author.username}" class="hover:text-foreground">
+            {post.author.username}
+          </a>
+        {/if}
         {#if post.source === 'feed'}
           <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">via feed</span>
         {/if}

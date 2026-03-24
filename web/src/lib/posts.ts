@@ -9,6 +9,7 @@ export interface Post {
   author: {
     id: string;
     username: string;
+    showAuthor?: boolean;
   };
   upvotesCount: number;
   score: number;

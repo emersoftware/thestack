@@ -137,10 +137,12 @@
       <span class="hidden sm:inline">·</span>
       <span>{getRelativeTime(post.createdAt)}</span>
       <span>·</span>
-      <a href="/user/{post.author.username}" class="hover:text-foreground truncate max-w-[100px] sm:max-w-none">
-        {post.author.username}
-      </a>
-      <span>·</span>
+      {#if post.author.showAuthor !== false}
+        <a href="/user/{post.author.username}" class="hover:text-foreground truncate max-w-[100px] sm:max-w-none">
+          {post.author.username}
+        </a>
+        <span>·</span>
+      {/if}
       <a href="/post/{post.slug || post.id}" data-nav-comments class="hover:text-foreground">
         comentarios
       </a>

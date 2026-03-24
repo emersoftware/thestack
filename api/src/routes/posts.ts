@@ -41,6 +41,7 @@ posts.get('/', async (c) => {
         createdAt: schema.posts.createdAt,
         authorId: schema.posts.authorId,
         authorUsername: schema.users.username,
+        authorShowAuthor: schema.users.showAuthor,
         source: schema.posts.source,
       })
       .from(schema.posts)
@@ -81,6 +82,7 @@ posts.get('/', async (c) => {
       author: {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
+        showAuthor: post.authorShowAuthor ?? true,
       },
       source: post.source || null,
       ...(user && { hasUpvoted: userUpvotes.has(post.id) }),
@@ -138,6 +140,7 @@ posts.get('/:identifier', async (c) => {
         createdAt: schema.posts.createdAt,
         authorId: schema.posts.authorId,
         authorUsername: schema.users.username,
+        authorShowAuthor: schema.users.showAuthor,
         source: schema.posts.source,
       })
       .from(schema.posts)
@@ -179,6 +182,7 @@ posts.get('/:identifier', async (c) => {
       author: {
         id: post.authorId,
         username: post.authorUsername || 'unknown',
+        showAuthor: post.authorShowAuthor ?? true,
       },
       source: post.source || null,
       ...(user && { hasUpvoted }),

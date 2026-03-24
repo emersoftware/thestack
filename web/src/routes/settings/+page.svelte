@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { useSession, type CustomUser } from '$lib/auth';
-  import { getUser, updateNewsletterPreference, type UserProfile } from '$lib/users';
+  import { getUser, updateUser, type UserProfile } from '$lib/users';
   import { getMyFeeds, createFeed, deleteFeed, type Feed, type FeedType } from '$lib/feeds';
 
   const session = useSession();
@@ -104,9 +104,12 @@
     setTimeout(() => (copiedFeedId = null), 2000);
   }
 
-  async function toggleNewsletter() {
+  async function toggleSetting(
+    field: 'newsletterEnabled' | 'showAuthor',
+    messages: { on: string; off: string },
+    defaultValue = false,
+  ) {
     if (!profile || !user) return;
-
     const username = user.username || user.name;
     if (!username) return;
 
@@ -115,23 +118,28 @@
     successMessage = '';
 
     try {
-      const newValue = !profile.newsletterEnabled;
-      await updateNewsletterPreference(username, newValue);
-      profile.newsletterEnabled = newValue;
-      successMessage = newValue
-        ? 'Newsletter activado'
-        : 'Newsletter desactivado';
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        successMessage = '';
-      }, 3000);
+      const newValue = !(profile[field] ?? defaultValue);
+      await updateUser(username, { [field]: newValue });
+      profile[field] = newValue;
+      successMessage = newValue ? messages.on : messages.off;
+      setTimeout(() => { successMessage = ''; }, 3000);
     } catch (err) {
       error = 'Error al actualizar preferencia';
     } finally {
       saving = false;
     }
   }
+
+  const toggleNewsletter = () => toggleSetting(
+    'newsletterEnabled',
+    { on: 'Newsletter activado', off: 'Newsletter desactivado' },
+  );
+
+  const toggleShowAuthor = () => toggleSetting(
+    'showAuthor',
+    { on: 'Tu nombre se muestra en los posts', off: 'Tu nombre esta oculto en los posts' },
+    true,
+  );
 </script>
 
 <svelte:head>
@@ -149,6 +157,18 @@
     </div>
   {:else if profile}
     <div class="space-y-6">
+      {#if successMessage}
+        <div class="rounded-lg bg-accent/10 border border-accent px-3 py-2 text-sm text-accent">
+          {successMessage}
+        </div>
+      {/if}
+
+      {#if error && profile}
+        <div class="rounded-lg border border-error bg-error/10 px-3 py-2 text-sm text-error">
+          {error}
+        </div>
+      {/if}
+
       <!-- Newsletter Section -->
       <div class="bg-card border border-border rounded-xl p-4 sm:p-6">
         <h2 class="text-base sm:text-lg font-medium text-foreground mb-4">
@@ -175,18 +195,34 @@
             ></span>
           </button>
         </div>
+      </div>
 
-        {#if successMessage}
-          <div class="mt-4 rounded-lg bg-accent/10 border border-accent px-3 py-2 text-sm text-accent">
-            {successMessage}
-          </div>
-        {/if}
+      <!-- Show Author Section -->
+      <div class="bg-card border border-border rounded-xl p-4 sm:p-6">
+        <h2 class="text-base sm:text-lg font-medium text-foreground mb-4">
+          Privacidad
+        </h2>
 
-        {#if error && profile}
-          <div class="mt-4 rounded-lg border border-error bg-error/10 px-3 py-2 text-sm text-error">
-            {error}
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <p class="text-sm text-muted-foreground">
+              Mostrar tu nombre en los posts del feed. Si desactivas esto, tus posts solo mostraran el titulo y el sitio.
+            </p>
           </div>
-        {/if}
+
+          <button
+            onclick={toggleShowAuthor}
+            disabled={saving}
+            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed {(profile.showAuthor ?? true) ? 'bg-accent' : 'bg-muted'}"
+            role="switch"
+            aria-checked={profile.showAuthor ?? true}
+            aria-label="Mostrar nombre en posts"
+          >
+            <span
+              class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {(profile.showAuthor ?? true) ? 'translate-x-5' : 'translate-x-0'}"
+            ></span>
+          </button>
+        </div>
       </div>
 
       <!-- Feeds Section -->

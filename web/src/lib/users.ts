@@ -7,6 +7,7 @@ export interface UserProfile {
   about: string | null;
   createdAt: string;
   newsletterEnabled?: boolean;
+  showAuthor?: boolean;
   pendingCount?: number;
 }
 
@@ -28,22 +29,12 @@ export async function getUserPosts(
   );
 }
 
-export async function updateUserAbout(
+export async function updateUser(
   username: string,
-  about: string
+  data: { about?: string; newsletterEnabled?: boolean; showAuthor?: boolean }
 ): Promise<{ success: boolean }> {
   return apiFetch(`/api/users/${encodeURIComponent(username)}`, {
     method: 'PUT',
-    body: JSON.stringify({ about }),
-  });
-}
-
-export async function updateNewsletterPreference(
-  username: string,
-  newsletterEnabled: boolean
-): Promise<{ success: boolean; newsletterEnabled: boolean }> {
-  return apiFetch(`/api/users/${encodeURIComponent(username)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ newsletterEnabled }),
+    body: JSON.stringify(data),
   });
 }

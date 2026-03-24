@@ -11,6 +11,7 @@ const users = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 const updateUserSchema = z.object({
   about: z.string().max(500, 'Bio muy larga (max 500)').optional(),
   newsletterEnabled: z.boolean().optional(),
+  showAuthor: z.boolean().optional(),
 });
 
 users.get('/:username', async (c) => {
@@ -26,6 +27,7 @@ users.get('/:username', async (c) => {
         about: schema.users.about,
         createdAt: schema.users.createdAt,
         newsletterEnabled: schema.users.newsletterEnabled,
+        showAuthor: schema.users.showAuthor,
       })
       .from(schema.users)
       .where(eq(schema.users.username, username))
@@ -58,8 +60,8 @@ users.get('/:username', async (c) => {
       karma: user[0].karma,
       about: user[0].about,
       createdAt: user[0].createdAt ? new Date(user[0].createdAt).toISOString() : null,
-      // Only include newsletter preference and pending count for own profile
-      ...(isOwnProfile && { newsletterEnabled: user[0].newsletterEnabled, pendingCount }),
+      // Only include newsletter preference, showAuthor and pending count for own profile
+      ...(isOwnProfile && { newsletterEnabled: user[0].newsletterEnabled, showAuthor: user[0].showAuthor, pendingCount }),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -97,6 +99,7 @@ users.get('/:username/posts', async (c) => {
         createdAt: schema.posts.createdAt,
         authorId: schema.posts.authorId,
         authorUsername: schema.users.username,
+        authorShowAuthor: schema.users.showAuthor,
       })
       .from(schema.posts)
       .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
@@ -142,6 +145,7 @@ users.get('/:username/posts', async (c) => {
         author: {
           id: p.authorId,
           username: p.authorUsername || 'unknown',
+          showAuthor: p.authorShowAuthor ?? true,
         },
         ...(currentUser && { hasUpvoted: userUpvotes.has(p.id) }),
       })),
@@ -172,7 +176,7 @@ users.put('/:username', requireAuth(), async (c) => {
       return c.json({ error: validation.error.issues[0].message }, 400);
     }
 
-    const { about, newsletterEnabled } = validation.data;
+    const { about, newsletterEnabled, showAuthor } = validation.data;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (about !== undefined) {
@@ -181,13 +185,16 @@ users.put('/:username', requireAuth(), async (c) => {
     if (newsletterEnabled !== undefined) {
       updateData.newsletterEnabled = newsletterEnabled;
     }
+    if (showAuthor !== undefined) {
+      updateData.showAuthor = showAuthor;
+    }
 
     await db
       .update(schema.users)
       .set(updateData)
       .where(eq(schema.users.id, user.id));
 
-    return c.json({ success: true, about: about ?? '', newsletterEnabled });
+    return c.json({ success: true, about: about ?? '', newsletterEnabled, showAuthor });
   } catch (error) {
     console.error('Error updating user:', error);
     return c.json({ error: 'Error al actualizar perfil' }, 500);

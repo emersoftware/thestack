@@ -3,7 +3,7 @@
   import type { PageData } from './$types';
   import {
     getUserPosts,
-    updateUserAbout,
+    updateUser,
     type UserProfile,
   } from '$lib/users';
   import { getMyUpvotedPostIds } from '$lib/votes';
@@ -80,7 +80,7 @@
     if (!username) return;
     saving = true;
     try {
-      await updateUserAbout(username, editAbout);
+      await updateUser(username, { about: editAbout });
       if (profile) profile.about = editAbout;
       editing = false;
     } catch (err) {
