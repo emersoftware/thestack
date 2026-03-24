@@ -323,13 +323,21 @@ admin.put('/users/:id/remove-super-admin', requireSuperAdmin(), async (c) => {
   }
 });
 
-// GET /admin/newsletter/status - countdown, subscribers, current draft
+// GET /admin/newsletter/status - countdown, subscribers, current draft, paused state
 admin.get('/newsletter/status', async (c) => {
   const db = drizzle(c.env.DB, { schema });
   try {
     const subscribers = await getNewsletterSubscribers(db);
     const nextSendAt = getNextMondayAt18UTC();
     const secondsUntilNextSend = Math.max(0, Math.floor((nextSendAt.getTime() - Date.now()) / 1000));
+
+    // Get paused state
+    const [nlConfig] = await db
+      .select()
+      .from(schema.newsletterConfig)
+      .where(eq(schema.newsletterConfig.id, 'default'))
+      .limit(1);
+    const paused = nlConfig?.paused ?? false;
 
     // Find current draft/scheduled by send date
     const [currentDraft] = await db
@@ -344,6 +352,7 @@ admin.get('/newsletter/status', async (c) => {
       .limit(1);
 
     return c.json({
+      paused,
       activeSubscribers: subscribers.length,
       nextSendAt: nextSendAt.toISOString(),
       secondsUntilNextSend,
@@ -360,6 +369,41 @@ admin.get('/newsletter/status', async (c) => {
   } catch (error) {
     console.error('Error fetching newsletter status:', error);
     return c.json({ error: 'Error al obtener estado del newsletter' }, 500);
+  }
+});
+
+// POST /admin/newsletter/pause - toggle newsletter pause state
+admin.post('/newsletter/pause', async (c) => {
+  const db = drizzle(c.env.DB, { schema });
+  try {
+    const body = await c.req.json<{ paused: boolean }>();
+    const paused = Boolean(body.paused);
+    const now = new Date();
+
+    const [existing] = await db
+      .select()
+      .from(schema.newsletterConfig)
+      .where(eq(schema.newsletterConfig.id, 'default'))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(schema.newsletterConfig)
+        .set({ paused, updatedAt: now })
+        .where(eq(schema.newsletterConfig.id, 'default'));
+    } else {
+      await db.insert(schema.newsletterConfig).values({
+        id: 'default',
+        paused,
+        updatedAt: now,
+      });
+    }
+
+    console.log(`[Admin] Newsletter ${paused ? 'paused' : 'resumed'}`);
+    return c.json({ paused });
+  } catch (error) {
+    console.error('Error toggling newsletter pause:', error);
+    return c.json({ error: 'Error al cambiar estado del newsletter' }, 500);
   }
 });
 

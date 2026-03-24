@@ -166,9 +166,19 @@ export default {
     // Create weekly draft - runs Friday at 18:00 UTC
     if (event.cron === '0 18 * * FRI') {
       try {
-        console.log('[Cron] Creating weekly newsletter draft...');
-        const draft = await createWeeklyDraft(env);
-        console.log(`[Cron] Draft created/found: ${draft.id} - "${draft.subject}"`);
+        // Check if newsletter is paused
+        const [nlConfig] = await db
+          .select()
+          .from(schema.newsletterConfig)
+          .where(eq(schema.newsletterConfig.id, 'default'))
+          .limit(1);
+        if (nlConfig?.paused) {
+          console.log('[Cron] Newsletter is paused, skipping draft creation');
+        } else {
+          console.log('[Cron] Creating weekly newsletter draft...');
+          const draft = await createWeeklyDraft(env);
+          console.log(`[Cron] Draft created/found: ${draft.id} - "${draft.subject}"`);
+        }
       } catch (error) {
         console.error('[Cron] Error creating newsletter draft:', error);
       }
@@ -191,11 +201,21 @@ export default {
     // Weekly newsletter - runs Monday at 18:00 UTC (15:00 Chile summer / 14:00 Chile winter)
     if (event.cron === '0 18 * * MON') {
       try {
-        console.log('[Cron] Starting weekly newsletter...');
-        const result = await sendWeeklyNewsletter(env);
-        console.log(
-          `[Cron] Newsletter completed: ${result.sent} sent, ${result.errors} errors`
-        );
+        // Check if newsletter is paused
+        const [nlConfig] = await db
+          .select()
+          .from(schema.newsletterConfig)
+          .where(eq(schema.newsletterConfig.id, 'default'))
+          .limit(1);
+        if (nlConfig?.paused) {
+          console.log('[Cron] Newsletter is paused, skipping send');
+        } else {
+          console.log('[Cron] Starting weekly newsletter...');
+          const result = await sendWeeklyNewsletter(env);
+          console.log(
+            `[Cron] Newsletter completed: ${result.sent} sent, ${result.errors} errors`
+          );
+        }
       } catch (error) {
         console.error('[Cron] Error sending newsletter:', error);
       }

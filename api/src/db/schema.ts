@@ -305,6 +305,14 @@ export const scoringConfig = sqliteTable('scoring_config', {
 
 export type ScoringConfig = typeof scoringConfig.$inferSelect;
 
+export const newsletterConfig = sqliteTable('newsletter_config', {
+  id: text('id').primaryKey().default('default'),
+  paused: integer('paused', { mode: 'boolean' }).notNull().default(false),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type NewsletterConfig = typeof newsletterConfig.$inferSelect;
+
 export type Feed = typeof feeds.$inferSelect;
 export type NewFeed = typeof feeds.$inferInsert;
 export type FeedLog = typeof feedLogs.$inferSelect;

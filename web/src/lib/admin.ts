@@ -80,6 +80,7 @@ export interface NewsletterSendItem {
 }
 
 export interface NewsletterStatus {
+  paused: boolean;
   activeSubscribers: number;
   nextSendAt: string;
   secondsUntilNextSend: number;
@@ -99,6 +100,14 @@ export async function upsertNewsletterDraft(subject: string): Promise<Newsletter
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subject }),
+  });
+}
+
+export async function toggleNewsletterPause(paused: boolean): Promise<{ paused: boolean }> {
+  return apiFetch('/api/admin/newsletter/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused }),
   });
 }
 

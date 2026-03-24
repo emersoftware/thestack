@@ -15,6 +15,7 @@
     getNewsletterStatus,
     getNewsletterSends,
     upsertNewsletterDraft,
+    toggleNewsletterPause,
     getAnalyticsOverview,
     getPostsPerDay,
     getRegistrationsPerDay,
@@ -62,6 +63,7 @@
   let nlCountdown = $state('');
   let nlLoading = $state(false);
   let nlTabLoaded = $state(false);
+  let nlPauseToggling = $state(false);
   let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
   // Feeds state
@@ -256,6 +258,19 @@
       console.error('Error saving subject:', err);
     } finally {
       nlSubjectSaving = false;
+    }
+  }
+
+  async function handleTogglePause() {
+    if (!nlStatus) return;
+    nlPauseToggling = true;
+    try {
+      const result = await toggleNewsletterPause(!nlStatus.paused);
+      nlStatus = { ...nlStatus, paused: result.paused };
+    } catch (err) {
+      console.error('Error toggling newsletter pause:', err);
+    } finally {
+      nlPauseToggling = false;
     }
   }
 
@@ -839,11 +854,46 @@
       {#if nlLoading && !nlTabLoaded}
         <p class="text-muted-foreground text-center py-8">Cargando newsletter...</p>
       {:else}
+        <!-- Estado del newsletter -->
+        {#if nlStatus}
+          <div class="bg-card border border-border rounded-xl p-6 mb-4 {nlStatus.paused ? 'border-warning/40' : ''}">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-foreground">Estado del newsletter</h3>
+                <p class="text-sm text-muted-foreground mt-1">
+                  {#if nlStatus.paused}
+                    El envio automatico esta pausado. No se crearan borradores ni se enviaran newsletters.
+                  {:else}
+                    El newsletter se envia automaticamente cada lunes a las 18:00 UTC.
+                  {/if}
+                </p>
+              </div>
+              <button
+                onclick={handleTogglePause}
+                disabled={nlPauseToggling}
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 {nlStatus.paused ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20'}"
+              >
+                {#if nlPauseToggling}
+                  ...
+                {:else if nlStatus.paused}
+                  Reanudar
+                {:else}
+                  Pausar
+                {/if}
+              </button>
+            </div>
+          </div>
+        {/if}
+
         <!-- Proximo envio -->
-        <div class="bg-card border border-border rounded-xl p-6 mb-4">
+        <div class="bg-card border border-border rounded-xl p-6 mb-4 {nlStatus?.paused ? 'opacity-50' : ''}">
           <h3 class="text-sm font-semibold text-foreground mb-3">Proximo envio</h3>
           <div class="flex flex-wrap items-baseline gap-4">
-            <span class="text-2xl font-bold text-foreground font-mono">{nlCountdown}</span>
+            {#if nlStatus?.paused}
+              <span class="text-2xl font-bold text-muted-foreground">Pausado</span>
+            {:else}
+              <span class="text-2xl font-bold text-foreground font-mono">{nlCountdown}</span>
+            {/if}
             {#if nlStatus}
               <span class="text-sm text-muted-foreground">
                 {new Date(nlStatus.nextSendAt).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
