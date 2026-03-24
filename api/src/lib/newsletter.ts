@@ -98,7 +98,8 @@ export async function getWeeklyTopPosts(
     .where(
       and(
         gte(schema.posts.createdAt, weekAgo),
-        eq(schema.posts.isDeleted, false)
+        eq(schema.posts.isDeleted, false),
+        eq(schema.posts.status, 'published')
       )
     )
     .orderBy(desc(schema.posts.upvotesCount))
