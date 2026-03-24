@@ -8,6 +8,7 @@
   let { size = 'md' }: { size?: 'md' | 'lg' } = $props();
 
   const sizeClass = size === 'md' ? 'w-8 h-8' : 'w-16 h-16';
+  const sizePx = size === 'md' ? 32 : 64;
 
   // Pre-calculated offsets based on rectangle Y positions
   // -(rectY - firstRectY) where firstRectY = 2
@@ -94,6 +95,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <svg
   class={sizeClass}
+  width={sizePx}
+  height={sizePx}
   viewBox="0 0 40 40"
   onmouseenter={handleMouseEnter}
 >

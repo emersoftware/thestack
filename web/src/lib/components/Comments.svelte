@@ -319,6 +319,8 @@
           >
             <svg
               class="w-3 h-3 {upvotingComment === comment.id ? 'opacity-50' : ''}"
+              width="12"
+              height="12"
               viewBox="0 0 24 24"
               fill={comment.hasUpvoted ? 'currentColor' : 'none'}
               stroke="currentColor"
@@ -334,7 +336,7 @@
             data-nav-reply
             class="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
-            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="w-3 h-3" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 10h10a5 5 0 0 1 5 5v6M3 10l6-6M3 10l6 6"/>
             </svg>
             responder

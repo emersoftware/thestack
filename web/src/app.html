@@ -31,6 +31,16 @@
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
 
+    <!-- Fallback layout for basic browsers (Kindle, e-readers) where Tailwind CSS @layer is unsupported.
+         Values match Tailwind's base breakpoint. On modern browsers, Tailwind classes take effect normally. -->
+    <style>
+      header { display: flex; align-items: center; justify-content: space-between; max-width: 56rem; margin: 0 auto; padding: 0.75rem 1rem; }
+      header > div { display: flex; align-items: center; gap: 0.75rem; }
+      header > div > a:first-child { display: inline-flex; align-items: center; gap: 0.375rem; }
+      header h1 { font-size: 1.125rem; font-weight: 700; margin: 0; }
+      header nav { display: inline-flex; align-items: center; }
+    </style>
+
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

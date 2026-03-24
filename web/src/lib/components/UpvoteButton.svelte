@@ -25,6 +25,8 @@
 >
   <svg
     class="w-4 h-4 {loading ? 'opacity-50' : ''}"
+    width="16"
+    height="16"
     viewBox="0 0 24 24"
     fill={active ? 'currentColor' : 'none'}
     stroke="currentColor"

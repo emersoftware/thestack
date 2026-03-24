@@ -107,7 +107,7 @@
           class="flex items-center gap-1 text-sm text-foreground hover:text-foreground"
         >
           {user.username || user.name}
-          <svg class="w-4 h-4 transition-transform {dropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 transition-transform {dropdownOpen ? 'rotate-180' : ''}" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
