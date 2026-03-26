@@ -1042,10 +1042,10 @@
                               <div class="flex items-center justify-between gap-2">
                                 <span class="font-medium text-foreground truncate">{log.subject || 'Sin asunto'}</span>
                                 <div class="flex items-center gap-2 shrink-0">
-                                  <span class="px-2 py-0.5 rounded-full {log.status === 'completed' ? 'bg-success/10 text-success' : log.status === 'error' ? 'bg-error/10 text-error' : 'bg-muted text-muted-foreground'}">
+                                  <span class="px-2 py-0.5 rounded-full {log.status === 'completed' ? 'bg-success/10 text-success' : log.status === 'error' ? 'bg-error/10 text-error' : log.status === 'rate_limited' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}">
                                     {log.status}
                                   </span>
-                                  {#if log.status === 'error'}
+                                  {#if log.status === 'error' || log.status === 'rate_limited'}
                                     <button
                                       onclick={() => handleRetryLog(log.id)}
                                       disabled={retryingLogId === log.id}

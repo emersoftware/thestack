@@ -581,8 +581,8 @@ admin.post('/feeds/logs/:logId/retry', async (c) => {
       return c.json({ error: 'Log no encontrado' }, 404);
     }
 
-    if (log.status !== 'error') {
-      return c.json({ error: 'Solo se pueden reintentar logs con error' }, 400);
+    if (log.status !== 'error' && log.status !== 'rate_limited') {
+      return c.json({ error: 'Solo se pueden reintentar logs con error o rate limited' }, 400);
     }
 
     if (!log.rawBody) {

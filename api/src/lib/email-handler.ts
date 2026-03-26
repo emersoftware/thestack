@@ -31,6 +31,13 @@ export async function handleIncomingEmail(
 
     if (!feed) return;
 
+    // Parse email early so rawBody is available for rate_limited logs too
+    const rawEmail = await new Response(message.raw).arrayBuffer();
+    const parser = new PostalMime();
+    const parsed = await parser.parse(rawEmail);
+
+    const rawBody = (parsed.html || parsed.text || '').slice(0, 16000);
+
     // Rate limit: max 1 processed email every 3 days per feed
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
     const [recentLog] = await db
@@ -49,22 +56,14 @@ export async function handleIncomingEmail(
       await db.insert(schema.feedLogs).values({
         id: generateId(),
         feedId: feed.id,
-        subject: message.headers.get('subject') || null,
+        subject: parsed.subject || null,
         source: message.from,
+        rawBody,
         status: 'rate_limited',
         createdAt: new Date(),
       });
       return;
     }
-
-    // Parse email
-    const rawEmail = await new Response(message.raw).arrayBuffer();
-    const parser = new PostalMime();
-    const parsed = await parser.parse(rawEmail);
-
-    // Store the email body for potential retries
-    const bodyContent = parsed.html || parsed.text || '';
-    const rawBody = bodyContent.slice(0, 16000);
 
     // Extract links from HTML body
     const links = extractLinks(parsed.html || '');
