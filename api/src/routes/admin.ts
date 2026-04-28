@@ -5,7 +5,7 @@ import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { requireAdmin, requireSuperAdmin, type AuthVariables, type AuthUser } from '../middleware/auth';
 import { sendWeeklyNewsletter, createWeeklyDraft, getWeeklySubject, getNextMondayAt18UTC, getNewsletterSubscribers } from '../lib/newsletter';
-import { generateSlug, calculateHNScore } from '../lib/utils';
+import { generateSlug, calculateHNScore, classifyFetchError, batchInChunks } from '../lib/utils';
 import { getScoringConfig } from '../lib/scoring';
 
 const admin = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
@@ -59,7 +59,10 @@ admin.get('/users', async (c) => {
   }
 });
 
-admin.put('/users/:id/promote', async (c) => {
+// Only a super-admin can mint new admins. This mirrors demote/ban, which
+// already restrict admin-on-admin actions to super-admin and prevents an
+// admin chain that a super-admin can't fully unwind.
+admin.put('/users/:id/promote', requireSuperAdmin(), async (c) => {
   const db = drizzle(c.env.DB, { schema });
   const userId = c.req.param('id');
 
@@ -623,7 +626,7 @@ admin.post('/feeds/logs/:logId/retry', async (c) => {
         const dbInner = drizzle(c.env.DB, { schema });
         await dbInner
           .update(schema.feedLogs)
-          .set({ status: 'error', error: String(err) })
+          .set({ status: 'error', error: classifyFetchError(err) })
           .where(eq(schema.feedLogs.id, logId));
       })
     );
@@ -1115,7 +1118,9 @@ admin.post('/scoring/simulate', async (c) => {
     const validationError = validateScoringParams(body);
     if (validationError) return c.json({ error: validationError }, 400);
 
-    // Get ALL published non-deleted posts to properly compute rankings
+    // Constrain to the recalc window — posts outside it would not be re-ranked
+    // by the cron anyway, so they're not relevant for the simulation preview.
+    const cutoff = new Date(Date.now() - body.recalcWindowHours * 60 * 60 * 1000);
     const allPosts = await db
       .select({
         id: schema.posts.id,
@@ -1128,7 +1133,13 @@ admin.post('/scoring/simulate', async (c) => {
       })
       .from(schema.posts)
       .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .where(and(eq(schema.posts.isDeleted, false), eq(schema.posts.status, 'published')))
+      .where(
+        and(
+          eq(schema.posts.isDeleted, false),
+          eq(schema.posts.status, 'published'),
+          gte(schema.posts.createdAt, cutoff)
+        )
+      )
       .orderBy(desc(schema.posts.score));
 
     const newParams = { gravity: body.gravity, boost: body.boost, ageOffsetHours: body.ageOffsetHours };
@@ -1214,9 +1225,7 @@ admin.post('/scoring/apply', async (c) => {
       return db.update(schema.posts).set({ score: newScore }).where(eq(schema.posts.id, post.id));
     });
 
-    if (updates.length > 0) {
-      await db.batch(updates as [typeof updates[0], ...typeof updates]);
-    }
+    await batchInChunks(db, updates);
 
     console.log(`[Admin] Scoring config applied: gravity=${body.gravity}, boost=${body.boost}, offset=${body.ageOffsetHours}, window=${body.recalcWindowHours}. Updated ${allPosts.length} posts.`);
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Env } from '../lib/auth';
 import * as schema from '../db/schema';
 import { createAuth } from '../lib/auth';
@@ -89,10 +89,17 @@ track.get('/open', async (c) => {
   if (token) {
     const db = drizzle(c.env.DB, { schema });
     try {
+      // Only record the first open — prevents bots and re-fetches from
+      // overwriting openedAt and distorting metrics.
       await db
         .update(schema.newsletterOpens)
         .set({ openedAt: new Date() })
-        .where(eq(schema.newsletterOpens.token, token));
+        .where(
+          and(
+            eq(schema.newsletterOpens.token, token),
+            isNull(schema.newsletterOpens.openedAt)
+          )
+        );
     } catch {
       // Fire and forget
     }

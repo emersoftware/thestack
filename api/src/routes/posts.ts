@@ -262,65 +262,60 @@ posts.post('/', requireVerifiedEmail(), async (c) => {
     const postId = generateId();
     const initialScore = calculateHNScore(1, now);
 
-    // Use batch for atomicity (D1 doesn't support transactions)
-    await db.batch([
-      db.insert(schema.posts).values({
-        id: postId,
-        title,
-        slug,
-        url,
-        domain,
-        authorId: user.id,
-        upvotesCount: 1,
-        score: initialScore,
-        isDeleted: false,
-        publishedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      }),
-      db.insert(schema.postUpvotes).values({
-        id: generateId(),
-        postId,
-        userId: user.id,
-        createdAt: now,
-      }),
-      db
-        .update(schema.users)
-        .set({ karma: sql`${schema.users.karma} + 1` })
-        .where(eq(schema.users.id, user.id)),
-    ]);
+    try {
+      await db.batch([
+        db.insert(schema.posts).values({
+          id: postId,
+          title,
+          slug,
+          url,
+          domain,
+          authorId: user.id,
+          upvotesCount: 1,
+          score: initialScore,
+          isDeleted: false,
+          publishedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        db.insert(schema.postUpvotes).values({
+          id: generateId(),
+          postId,
+          userId: user.id,
+          createdAt: now,
+        }),
+        db
+          .update(schema.users)
+          .set({ karma: sql`${schema.users.karma} + 1` })
+          .where(eq(schema.users.id, user.id)),
+      ]);
+    } catch (insertError) {
+      if (insertError instanceof Error && insertError.message.includes('UNIQUE constraint')) {
+        const [conflict] = await db
+          .select({ id: schema.posts.id })
+          .from(schema.posts)
+          .where(eq(schema.posts.url, url))
+          .limit(1);
+        return c.json({
+          error: 'Esta URL ya fue publicada',
+          existingPostId: conflict?.id,
+        }, 409);
+      }
+      throw insertError;
+    }
 
-    const createdPost = await db
-      .select({
-        id: schema.posts.id,
-        slug: schema.posts.slug,
-        title: schema.posts.title,
-        url: schema.posts.url,
-        domain: schema.posts.domain,
-        upvotesCount: schema.posts.upvotesCount,
-        score: schema.posts.score,
-        createdAt: schema.posts.createdAt,
-        authorId: schema.posts.authorId,
-        authorUsername: schema.users.username,
-      })
-      .from(schema.posts)
-      .leftJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .where(eq(schema.posts.id, postId))
-      .limit(1);
-
-    const post = createdPost[0];
     return c.json({
-      id: post.id,
-      slug: post.slug,
-      title: post.title,
-      url: post.url,
-      domain: post.domain,
-      upvotesCount: post.upvotesCount,
-      score: post.score,
-      createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
+      id: postId,
+      slug,
+      title,
+      url,
+      domain,
+      upvotesCount: 1,
+      score: initialScore,
+      createdAt: now.toISOString(),
       author: {
-        id: post.authorId,
-        username: post.authorUsername || 'unknown',
+        id: user.id,
+        username: user.username,
       },
     }, 201);
   } catch (error) {

@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte } from 'drizzle-orm';
 import PostalMime from 'postal-mime';
 import * as schema from '../db/schema';
-import { generateId } from './utils';
+import { generateId, classifyFetchError } from './utils';
 import { runFeedAgent } from './feed-agent';
 import { extractLinks, extractLinksFromText } from './link-utils';
 import type { Env } from './auth';
@@ -109,7 +109,7 @@ export async function handleIncomingEmail(
         const dbInner = drizzle(env.DB, { schema });
         return dbInner
           .update(schema.feedLogs)
-          .set({ status: 'error', error: String(err) })
+          .set({ status: 'error', error: classifyFetchError(err) })
           .where(eq(schema.feedLogs.id, logId));
       })
     );

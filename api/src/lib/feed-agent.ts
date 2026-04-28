@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
-import { generateId, escapeHtml, FEED_BOT_USER_AGENT } from './utils';
+import { escapeHtml, FEED_BOT_USER_AGENT, safeFetch, classifyFetchError } from './utils';
 import { createFeedPosts, sendPendingPostsNotification } from './post-creator';
 import { cleanUrl } from './link-utils';
 import type { Env } from './auth';
@@ -186,18 +186,13 @@ export async function runFeedAgent(
   const fetchUrlTool = tool(
     async ({ url }) => {
       try {
-        const response = await fetch(url, {
+        const { response, finalUrl } = await safeFetch(url, {
           headers: { 'User-Agent': FEED_BOT_USER_AGENT },
-          redirect: 'follow',
+          timeoutMs: 10_000,
         });
 
-        if (!response.ok) {
-          return `Error fetching ${url}: HTTP ${response.status}`;
-        }
-
-        // Store the final URL after redirects
-        if (response.url && response.url !== url) {
-          resolvedUrls.set(url, cleanUrl(response.url));
+        if (finalUrl !== url) {
+          resolvedUrls.set(url, cleanUrl(finalUrl));
         }
 
         const html = await response.text();
@@ -212,7 +207,7 @@ export async function runFeedAgent(
 
         return text || 'No content found';
       } catch (err) {
-        return `Error fetching ${url}: ${String(err)}`;
+        return `Error fetching ${url}: ${classifyFetchError(err)}`;
       }
     },
     {

@@ -13,7 +13,7 @@ import comments from './routes/comments';
 import track from './routes/track';
 import feeds from './routes/feeds';
 import * as schema from './db/schema';
-import { calculateHNScore } from './lib/utils';
+import { calculateHNScore, batchInChunks } from './lib/utils';
 import { getScoringConfig } from './lib/scoring';
 import { sendWeeklyNewsletter, createWeeklyDraft } from './lib/newsletter';
 import { handleIncomingEmail } from './lib/email-handler';
@@ -63,18 +63,51 @@ app.use('*', async (c, next) => {
   }
 });
 
+function getAllowedOrigins(env: Env): string[] {
+  return [env.FRONTEND_URL, 'https://thestack.cl'].filter(Boolean) as string[];
+}
+
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 app.use(
   '*',
   cors({
     origin: (origin, c) => {
-      const allowed = [c.env.FRONTEND_URL, 'https://thestack.cl'].filter(Boolean);
-      return allowed.includes(origin) ? origin : allowed[0];
+      const allowed = getAllowedOrigins(c.env);
+      return allowed.includes(origin) ? origin : null;
     },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 );
+
+// Defense-in-depth CSRF guard. SameSite=Lax cookies and CORS preflight cover
+// most cases, but this also blocks form submissions whose content-type bypasses
+// preflight (e.g., application/x-www-form-urlencoded).
+app.use('*', async (c, next) => {
+  if (!MUTATING_METHODS.has(c.req.method)) return next();
+  // Better Auth runs its own CSRF protection on its routes.
+  if (c.req.path.startsWith('/api/auth/')) return next();
+
+  const allowed = getAllowedOrigins(c.env);
+  const origin = c.req.header('Origin');
+  if (origin) {
+    if (!allowed.includes(origin)) return c.json({ error: 'Origin no autorizado' }, 403);
+    return next();
+  }
+
+  const referer = c.req.header('Referer');
+  if (!referer) return next();
+  try {
+    if (!allowed.includes(new URL(referer).origin)) {
+      return c.json({ error: 'Origin no autorizado' }, 403);
+    }
+  } catch {
+    return c.json({ error: 'Origin no autorizado' }, 403);
+  }
+  return next();
+});
 
 // Apply session middleware to routes that need user context
 // NOT to /api/auth/* (better-auth handles its own routes)
@@ -153,9 +186,7 @@ export default {
           return db.update(schema.posts).set({ score: newScore }).where(eq(schema.posts.id, post.id));
         });
 
-        if (updates.length > 0) {
-          await db.batch(updates as [typeof updates[0], ...typeof updates]);
-        }
+        await batchInChunks(db, updates);
 
         console.log(`[Cron] Updated scores for ${recentPosts.length} posts (gravity=${config.gravity}, window=${config.recalcWindowHours}h)`);
       } catch (error) {

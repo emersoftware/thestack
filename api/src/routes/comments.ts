@@ -62,6 +62,16 @@ comments.get('/post/:postId', async (c) => {
   const user = c.get('user');
 
   try {
+    const [post] = await db
+      .select({ id: schema.posts.id })
+      .from(schema.posts)
+      .where(and(eq(schema.posts.id, postId), eq(schema.posts.isDeleted, false)))
+      .limit(1);
+
+    if (!post) {
+      return c.json({ error: 'Post no encontrado' }, 404);
+    }
+
     const result = await db
       .select({
         id: schema.comments.id,

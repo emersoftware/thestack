@@ -3,7 +3,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
-import { generateId, FEED_BOT_USER_AGENT } from './utils';
+import { generateId, FEED_BOT_USER_AGENT, safeFetch, classifyFetchError } from './utils';
 import { cleanUrl } from './link-utils';
 import { createFeedPosts, sendPendingPostsNotification } from './post-creator';
 import type { Env } from './auth';
@@ -135,24 +135,21 @@ async function processRssFeed(
     return;
   }
 
-  // Fetch the RSS feed
   let xml: string;
   try {
-    const response = await fetch(feed.sourceUrl, {
+    const { response } = await safeFetch(feed.sourceUrl, {
       headers: { 'User-Agent': FEED_BOT_USER_AGENT },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
     xml = await response.text();
   } catch (err) {
+    console.error(`[RSS] Fetch error for feed ${feed.id}:`, err);
     await db.insert(schema.feedLogs).values({
       id: generateId(),
       feedId: feed.id,
       subject: null,
       source: feed.sourceUrl,
       status: 'error',
-      error: `Fetch failed: ${err}`,
+      error: classifyFetchError(err),
       createdAt: new Date(),
     });
     return;

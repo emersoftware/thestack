@@ -3,7 +3,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and, gte } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import type { Feed } from '../db/schema';
-import { generateId, FEED_BOT_USER_AGENT } from './utils';
+import { generateId, FEED_BOT_USER_AGENT, safeFetch, classifyFetchError } from './utils';
 import { runFeedAgent } from './feed-agent';
 import type { Env } from './auth';
 
@@ -81,25 +81,21 @@ async function processBlogFeed(
     return;
   }
 
-  // Fetch the blog HTML page
   let html: string;
   try {
-    const response = await fetch(feed.sourceUrl, {
+    const { response } = await safeFetch(feed.sourceUrl, {
       headers: { 'User-Agent': FEED_BOT_USER_AGENT },
-      redirect: 'follow',
     });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
     html = await response.text();
   } catch (err) {
+    console.error(`[Blog] Fetch error for feed ${feed.id}:`, err);
     await db.insert(schema.feedLogs).values({
       id: generateId(),
       feedId: feed.id,
       subject: null,
       source: feed.sourceUrl,
       status: 'error',
-      error: `Fetch failed: ${err}`,
+      error: classifyFetchError(err),
       createdAt: new Date(),
     });
     return;
@@ -147,7 +143,7 @@ async function processBlogFeed(
     console.error(`[Blog] Agent error for feed ${feed.id}:`, err);
     await db
       .update(schema.feedLogs)
-      .set({ status: 'error', error: String(err) })
+      .set({ status: 'error', error: classifyFetchError(err) })
       .where(eq(schema.feedLogs.id, logId));
   }
 }

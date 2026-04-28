@@ -19,24 +19,22 @@
   let submitting = $state(false);
   let upvotingComment = $state<string | null>(null);
   let deletingCommentId = $state<string | null>(null);
-  let upvotesLoaded = $state(false);
+  let loadedUpvotesFor = $state<string | null>(null);
 
-  // Load user's upvoted comments client-side (requires auth cookies)
+  // Load user's upvoted comments client-side (requires auth cookies).
+  // Re-runs when the user changes or when navigating to a different post.
   $effect(() => {
-    if (user && !upvotesLoaded) {
-      upvotesLoaded = true;
-      getMyCommentUpvotes(postId)
-        .then((upvotedIds) => {
-          const upvotedSet = new Set(upvotedIds);
-          comments = comments.map((c) => ({
-            ...c,
-            hasUpvoted: upvotedSet.has(c.id)
-          }));
-        })
-        .catch(() => {
-          // Silently fail - upvotes will show as false
-        });
-    }
+    const key = user ? `${user.id}:${postId}` : null;
+    if (!key || loadedUpvotesFor === key) return;
+    loadedUpvotesFor = key;
+    getMyCommentUpvotes(postId)
+      .then((upvotedIds) => {
+        const upvotedSet = new Set(upvotedIds);
+        comments = comments.map((c) => ({ ...c, hasUpvoted: upvotedSet.has(c.id) }));
+      })
+      .catch(() => {
+        // Silently fail - upvotes will show as false
+      });
   });
 
   // Build tree structure from flat comments
@@ -158,17 +156,27 @@
 
   async function confirmDelete() {
     if (!deletingCommentId) return;
+    const id = deletingCommentId;
     try {
-      await deleteComment(deletingCommentId);
+      await deleteComment(id);
       comments = comments.map(c =>
-        c.id === deletingCommentId
+        c.id === id
           ? { ...c, content: '[eliminado]', isDeleted: true, author: { ...c.author, username: '[eliminado]' } }
           : c
       );
-    } catch {
-      toast.error('Error al eliminar comentario');
-    } finally {
       deletingCommentId = null;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 403) toast.error('No tienes permiso para eliminar este comentario');
+        else if (err.status === 404) {
+          toast.error('El comentario no existe');
+          deletingCommentId = null;
+        } else {
+          toast.error(err.message || 'Error al eliminar comentario');
+        }
+      } else {
+        toast.error('Error al eliminar comentario');
+      }
     }
   }
 

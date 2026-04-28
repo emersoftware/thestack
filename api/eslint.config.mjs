@@ -15,6 +15,23 @@ export default [
       globals: {
         console: 'readonly',
         D1Database: 'readonly',
+        // Cloudflare Workers / Web Platform globals
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        Headers: 'readonly',
+        fetch: 'readonly',
+        crypto: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        ForwardableEmailMessage: 'readonly',
+        ExecutionContext: 'readonly',
+        ScheduledEvent: 'readonly',
       },
     },
     plugins: {

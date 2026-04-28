@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { signInWithEmail, signInWithGitHub } from '$lib/auth-utils';
+  import { signInWithEmail, signInWithGitHub, safeRedirect } from '$lib/auth-utils';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { logoStore } from '$lib/stores/logo';
@@ -9,7 +9,7 @@
   let error = $state('');
   let loading = $state(false);
 
-  const redirectTo = $derived($page.url.searchParams.get('redirect') || '/');
+  const redirectTo = $derived(safeRedirect($page.url.searchParams.get('redirect')));
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();

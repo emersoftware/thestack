@@ -27,13 +27,13 @@
   let optimisticCount = $state(post.upvotesCount);
   let loading = $state(false);
 
-  // Sync with prop changes
+  // Sync with prop changes, but never overwrite an in-flight optimistic update.
   $effect(() => {
-    optimisticUpvoted = hasUpvoted;
+    if (!loading) optimisticUpvoted = hasUpvoted;
   });
 
   $effect(() => {
-    optimisticCount = post.upvotesCount;
+    if (!loading) optimisticCount = post.upvotesCount;
   });
 
   async function handleUpvote() {
