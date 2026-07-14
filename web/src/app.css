@@ -16,24 +16,28 @@
   --error: #9b4d4d;
   --info: #4d6a9b;
   --warning: #9b7a4d;
+  --upvote: #171717;
+  --popover: #f5f5f5;
 }
 
 .dark {
-  --background: #0a1a0f;
-  --foreground: #f5f5f5;
-  --card: #0a1a0f;
-  --card-foreground: #4ade80;
-  --muted: #0a1a0f;
-  --muted-foreground: #6b9c77;
-  --border: #1a3d24;
-  --border-hover: #3d7a4a;
-  --input: #1a3d24;
-  --accent: #4ade80;
-  --accent-foreground: #0a1a0f;
-  --success: #4ade80;
-  --error: #f87171;
-  --info: #60a5fa;
-  --warning: #fbbf24;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: rgba(10, 17, 11, 0.55);
+  --card-foreground: #ffffff;
+  --muted: #0d150e;
+  --muted-foreground: #7a8a7e;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --input: rgba(255, 255, 255, 0.08);
+  --accent: #ffffff;
+  --accent-foreground: #171717;
+  --success: #00e676;
+  --error: #ff6b6b;
+  --info: #99c2ff;
+  --warning: #fb8841;
+  --upvote: #ffffff;
+  --popover: #0a110b;
 }
 
 @theme inline {
@@ -52,6 +56,8 @@
   --color-error: var(--error);
   --color-info: var(--info);
   --color-warning: var(--warning);
+  --color-upvote: var(--upvote);
+  --color-popover: var(--popover);
 
   /* Legacy aliases for backward compatibility */
   --color-the-white: var(--card);

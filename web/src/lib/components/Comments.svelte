@@ -6,6 +6,7 @@
   import { toast } from '$lib/toast';
   import { ApiError } from '$lib/api';
   import { logoStore } from '$lib/stores/logo';
+  import { triggerAsciiBurstFromEvent } from '$lib/ascii-burst';
 
   let { postId, initialComments = [] }: { postId: string; initialComments?: Comment[] } = $props();
 
@@ -83,6 +84,8 @@
 
     if (!newComment.trim() || submitting) return;
 
+    triggerAsciiBurstFromEvent(e);
+
     submitting = true;
     try {
       const comment = await createComment(postId, newComment.trim());
@@ -112,13 +115,15 @@
     }
   }
 
-  async function handleReply(parentId: string) {
+  async function handleReply(parentId: string, e: Event) {
     if (!user) {
       goto('/login');
       return;
     }
 
     if (!replyContent.trim() || submitting) return;
+
+    triggerAsciiBurstFromEvent(e);
 
     submitting = true;
     try {
@@ -188,7 +193,7 @@
     node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  async function handleUpvote(commentId: string) {
+  async function handleUpvote(commentId: string, e: MouseEvent) {
     if (!user) {
       goto('/login');
       return;
@@ -202,6 +207,9 @@
 
     const wasLiked = comment.hasUpvoted;
     const prevCount = comment.upvotesCount;
+
+    // Burst only when casting a vote, not when removing it.
+    if (!wasLiked) triggerAsciiBurstFromEvent(e);
 
     comments = comments.map(c =>
       c.id === commentId
@@ -320,7 +328,7 @@
           <!-- Like button -->
           <button
             type="button"
-            onclick={() => handleUpvote(comment.id)}
+            onclick={(e) => handleUpvote(comment.id, e)}
             disabled={upvotingComment === comment.id}
             data-nav-upvote
             class="flex items-center gap-1 transition-colors hover:cursor-pointer disabled:cursor-not-allowed {comment.hasUpvoted ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} {upvotingComment === comment.id ? 'animate-pulse' : ''}"
@@ -393,7 +401,7 @@
             </button>
             <button
               type="button"
-              onclick={() => handleReply(comment.id)}
+              onclick={(e) => handleReply(comment.id, e)}
               disabled={!replyContent.trim() || submitting}
               data-nav-submit={comment.id}
               class="px-3 py-1 text-xs font-medium text-accent-foreground bg-accent rounded-full hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -422,7 +430,7 @@
     onclick={() => deletingCommentId = null}
     role="dialog"
   >
-    <div class="bg-card rounded-xl shadow-xl max-w-sm w-full p-4" onclick={e => e.stopPropagation()}>
+    <div class="bg-popover rounded-xl shadow-xl max-w-sm w-full p-4" onclick={e => e.stopPropagation()}>
       <h2 class="text-lg font-semibold text-foreground mb-2">Eliminar comentario</h2>
       <p class="text-sm text-muted-foreground mb-4">Seguro? Esta acción no se puede deshacer.</p>
       <div class="flex justify-end gap-2">

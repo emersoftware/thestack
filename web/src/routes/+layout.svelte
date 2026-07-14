@@ -6,6 +6,7 @@
   import Header from '$lib/components/Header.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import KeyboardNav from '$lib/components/KeyboardNav.svelte';
+  import AsciiBackground from '$lib/components/AsciiBackground.svelte';
 
   let { children, data } = $props();
 
@@ -42,7 +43,9 @@
   });
 </script>
 
-<div class="min-h-screen p-2 sm:p-3 bg-background flex flex-col">
+<AsciiBackground />
+
+<div class="min-h-screen p-2 sm:p-3 bg-transparent flex flex-col relative z-[1]">
   <Header user={data.user} />
   <div class="flex-1 flex flex-col">
     {@render children()}

@@ -7,6 +7,7 @@
   import { toast } from '$lib/toast';
   import { logoStore } from '$lib/stores/logo';
   import { draftStore } from '$lib/stores/drafts';
+  import { triggerAsciiBurstFromEvent } from '$lib/ascii-burst';
 
   // User is guaranteed by server-side load (redirects if not logged in)
   let { data } = $props();
@@ -58,6 +59,8 @@
       toast.error('URL inválida. Debe comenzar con http:// o https://');
       return;
     }
+
+    triggerAsciiBurstFromEvent(e, 'md');
 
     loading = true;
 

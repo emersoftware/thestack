@@ -57,7 +57,7 @@
 
 	{#if dropdownOpen}
 		<div
-			class="absolute right-0 mt-2 w-36 bg-card border border-border rounded-lg shadow-lg py-1 z-50"
+			class="absolute right-0 mt-2 w-36 bg-popover border border-border rounded-lg shadow-lg py-1 z-50"
 		>
 			{#each themes as t}
 				<button

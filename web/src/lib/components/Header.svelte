@@ -113,7 +113,7 @@
         </button>
 
         {#if dropdownOpen}
-          <div class="absolute right-0 mt-2 w-40 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+          <div class="absolute right-0 mt-2 w-40 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
             <a
               href="/submit"
               onclick={closeDropdown}

@@ -42,7 +42,7 @@
   <title>Verificar email - the stack</title>
 </svelte:head>
 
-<div class="flex-1 flex items-center justify-center bg-background py-4 sm:py-0">
+<div class="flex-1 flex items-center justify-center py-4 sm:py-0">
   <div class="max-w-md w-full space-y-6 px-4 text-center">
     {#if success}
       <div class="space-y-4">

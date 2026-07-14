@@ -165,7 +165,7 @@
     onclick={() => showHelp = false}
     role="dialog"
   >
-    <div class="bg-card rounded-xl border border-border shadow-xl max-w-sm w-full" onclick={e => e.stopPropagation()}>
+    <div class="bg-popover rounded-xl border border-border shadow-xl max-w-sm w-full" onclick={e => e.stopPropagation()}>
       <div class="p-4 border-b border-border flex justify-between items-center">
         <h2 class="text-lg font-semibold text-foreground">Atajos</h2>
         <button onclick={() => showHelp = false} class="text-muted-foreground hover:text-foreground">
