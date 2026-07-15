@@ -1,12 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { onMount, tick } from 'svelte';
+  import { fade, fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
+  import { goto, preloadData } from '$app/navigation';
   import { createPost } from '$lib/posts';
   import { ApiError } from '$lib/api';
   import PostPreviewCard from '$lib/components/PostPreviewCard.svelte';
   import { toast } from '$lib/toast';
   import { logoStore } from '$lib/stores/logo';
   import { draftStore } from '$lib/stores/drafts';
+  import { pendingPost } from '$lib/stores/pendingPost';
+  import { ANIM } from '$lib/anim';
   import { triggerAsciiBurstFromEvent } from '$lib/ascii-burst';
 
   // User is guaranteed by server-side load (redirects if not logged in)
@@ -16,6 +20,25 @@
   let title = $state('');
   let url = $state('');
   let loading = $state(false);
+
+  // Post-publish exit sequence: the form leaves, only the preview remains, then
+  // the preview flies down and off-screen, and we navigate to /new.
+  let published = $state(false); // form/heading have left, preview is alone
+  let previewLeaving = $state(false); // preview is flying down and out
+  let navPromise: Promise<unknown> | null = null; // /new data, preloaded during the animation
+
+  const FORM_OUT_MS = ANIM.formOut; // heading + form fade out
+  const PREVIEW_HOLD_MS = ANIM.previewHold; // beat where only the preview is on screen
+  const PREVIEW_OUT_MS = ANIM.previewOut; // preview flies down and out
+
+  const prefersReducedMotion = () =>
+    typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Fires when the preview finishes flying out — jump to /new (data already warm).
+  async function finishAndNavigate() {
+    if (navPromise) await navPromise;
+    await goto('/new');
+  }
 
   onMount(() => {
     const draft = draftStore.load();
@@ -65,11 +88,27 @@
     loading = true;
 
     try {
-      await createPost(title.trim(), url.trim());
+      const newPost = await createPost(title.trim(), url.trim());
       draftStore.clear();
       logoStore.bump();
-      toast.success('Post publicado exitosamente');
-      goto('/');
+      // Hand the new post to /new so it can animate it into the list.
+      pendingPost.set(newPost);
+
+      if (prefersReducedMotion()) {
+        await goto('/new');
+        return;
+      }
+
+      // Warm /new's data while the exit animation plays so the swap is instant.
+      navPromise = preloadData('/new');
+
+      published = true; // heading + form fade out, leaving only the preview
+      await tick();
+      // Hold on the lone preview, then let it fly down and out (see markup).
+      // Navigation is triggered by the preview's onoutroend handler.
+      setTimeout(() => {
+        previewLeaving = true;
+      }, PREVIEW_HOLD_MS);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 403) {
@@ -94,14 +133,17 @@
 
 <div class="flex-1 flex items-center justify-center py-4 sm:py-0">
   <div class="max-w-md w-full space-y-6 sm:space-y-8 px-4">
-    <div>
-      <h2 class="text-center text-2xl sm:text-3xl text-foreground">
-        Publicar en <span class="font-extrabold text-foreground">the stack</span>
-      </h2>
-    </div>
+    {#if !published}
+      <div out:fade={{ duration: FORM_OUT_MS }}>
+        <h2 class="text-center text-2xl sm:text-3xl text-foreground">
+          Publicar en <span class="font-extrabold text-foreground">the stack</span>
+        </h2>
+      </div>
+    {/if}
 
     <div class="space-y-4">
-      <form onsubmit={handleSubmit} class="space-y-3">
+      {#if !published}
+      <form onsubmit={handleSubmit} class="space-y-3" out:fade={{ duration: FORM_OUT_MS }}>
         <div>
           <label for="title" class="block text-sm font-medium text-foreground mb-1">
             Título
@@ -152,9 +194,11 @@
           </a>
         </div>
       </form>
+      {/if}
 
       <div class="space-y-2">
-        <div class="flex items-center gap-2">
+        {#if !published}
+        <div class="flex items-center gap-2" out:fade={{ duration: FORM_OUT_MS }}>
           <p class="text-sm text-muted-foreground">Vista previa</p>
           <svg
             class="w-4 h-4 text-muted-foreground"
@@ -176,11 +220,16 @@
             />
           </svg>
         </div>
-        <PostPreviewCard
-          {title}
-          {url}
-          username={user.username || user.name || ''}
-        />
+        {/if}
+        {#if !previewLeaving}
+        <div out:fly={{ y: ANIM.previewFlyY, duration: PREVIEW_OUT_MS, easing: cubicOut }} onoutroend={finishAndNavigate}>
+          <PostPreviewCard
+            {title}
+            {url}
+            username={user.username || user.name || ''}
+          />
+        </div>
+        {/if}
       </div>
     </div>
   </div>
