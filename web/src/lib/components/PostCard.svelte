@@ -27,13 +27,21 @@
   let optimisticCount = $state(post.upvotesCount);
   let loading = $state(false);
 
-  // Sync with prop changes, but never overwrite an in-flight optimistic update.
+  // Sync with prop changes (e.g. async-loaded upvote status, or the parent
+  // replacing the post object).
+  //
+  // Do NOT guard these with `if (!loading)`: reading `loading` makes it a
+  // reactive dependency, so the effect re-runs when `loading` flips back to
+  // false at the end of handleUpvote and overwrites the fresh server result
+  // with the stale `hasUpvoted` / `post.upvotesCount` props (PostList never
+  // writes those back on toggle). That silently reverts every vote. PostHeader
+  // uses this same plain sync and works correctly.
   $effect(() => {
-    if (!loading) optimisticUpvoted = hasUpvoted;
+    optimisticUpvoted = hasUpvoted;
   });
 
   $effect(() => {
-    if (!loading) optimisticCount = post.upvotesCount;
+    optimisticCount = post.upvotesCount;
   });
 
   async function handleUpvote() {
